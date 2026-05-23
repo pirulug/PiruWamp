@@ -1,0 +1,30 @@
+# Compilados y artefactos de Python
+build/
+dist/
+.build/
+.compile/
+__pycache__/
+*.py[cod]
+*$py.class
+*.spec
+
+# Ejecutables
+*.exe
+*.dll
+
+# Logs de la aplicación
+*.log
+crash.log
+
+# Datos de la base de datos (MariaDB)
+# Ignorar todo en data/ excepto si hay un .gitignore ahí
+data/*
+!data/.gitignore
+
+# Proyectos del usuario
+# Ignorar todos los proyectos creados, excepto el index.php (el dashboard)
+www/*
+!www/index.php
+
+# Caché temporal de phpMyAdmin
+etc/phpMyAdmin/app/cache/
