@@ -1,0 +1,199 @@
+
+
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" data-content_root="./">
+<head>
+  <meta charset="utf-8" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Requirements &mdash; phpMyAdmin 6.0.0-dev documentation</title>
+      <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=fa44fd50" />
+      <link rel="stylesheet" type="text/css" href="_static/css/theme.css?v=f5127f15" />
+
+  
+      <script src="_static/jquery.js?v=8dae8fb0"></script>
+      <script src="_static/_sphinx_javascript_frameworks_compat.js?v=2cd50e6c"></script>
+      <script src="_static/documentation_options.js?v=2a02db7b"></script>
+      <script src="_static/doctools.js?v=9bcbadda"></script>
+      <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="copyright" title="Copyright" href="copyright.html" />
+    <link rel="next" title="Installation" href="setup.html" />
+    <link rel="prev" title="Introduction" href="intro.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+
+          
+          
+          <a href="index.html" class="icon icon-home">
+            phpMyAdmin
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="intro.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Requirements</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#web-server">Web server</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#php">PHP</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#database">Database</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#web-browser">Web browser</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="setup.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="config.html">Configuration</a></li>
+<li class="toctree-l1"><a class="reference internal" href="user.html">User Guide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="faq.html">FAQ - Frequently Asked Questions</a></li>
+<li class="toctree-l1"><a class="reference internal" href="developers.html">Developers Information</a></li>
+<li class="toctree-l1"><a class="reference internal" href="security.html">Security policy</a></li>
+<li class="toctree-l1"><a class="reference internal" href="vendors.html">Distributing and packaging phpMyAdmin</a></li>
+<li class="toctree-l1"><a class="reference internal" href="copyright.html">Copyright</a></li>
+<li class="toctree-l1"><a class="reference internal" href="credits.html">Credits</a></li>
+<li class="toctree-l1"><a class="reference internal" href="glossary.html">Glossary</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">phpMyAdmin</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home" aria-label="Home"></a></li>
+      <li class="breadcrumb-item active">Requirements</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/require.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="requirements">
+<span id="require"></span><h1>Requirements<a class="headerlink" href="#requirements" title="Link to this heading"></a></h1>
+<section id="web-server">
+<h2>Web server<a class="headerlink" href="#web-server" title="Link to this heading"></a></h2>
+<p>Since phpMyAdmin’s interface is based entirely in your browser, you’ll need a
+web server (such as Apache, nginx, <a class="reference internal" href="glossary.html#term-IIS"><span class="xref std std-term">IIS</span></a>) to install phpMyAdmin’s files into.</p>
+</section>
+<section id="php">
+<h2>PHP<a class="headerlink" href="#php" title="Link to this heading"></a></h2>
+<ul class="simple">
+<li><p>You need PHP 8.2.0 or newer.</p></li>
+<li><p>You need the following PHP extensions
+(<code class="docutils literal notranslate"><span class="pre">php</span> <span class="pre">-m</span></code> or <code class="docutils literal notranslate"><span class="pre">phpinfo()</span></code> will indicate the enabled ones):</p>
+<ul>
+<li><p>normally bundled into PHP and enabled by default:</p>
+<ul>
+<li><p><a class="reference external" href="https://www.php.net/json">json</a> provides JSON functions</p></li>
+<li><p><a class="reference external" href="https://www.php.net/session">session</a> provides session storage</p></li>
+<li><p><a class="reference external" href="https://www.php.net/pcre">pcre</a> provides regular expression functions</p></li>
+<li><p><a class="reference external" href="https://www.php.net/hash">hash</a> provides basic hashing functions</p></li>
+<li><p><a class="reference external" href="https://www.php.net/spl">spl</a> the Standard PHP Library (SPL) extension</p></li>
+<li><p><a class="reference external" href="https://www.php.net/sodium">sodium</a> a modern cryptography library</p></li>
+</ul>
+</li>
+<li><p>manual installation required:</p>
+<ul>
+<li><p><a class="reference external" href="https://www.php.net/mysqli">mysqli</a> To connect to MySQL/MariaDB databases</p></li>
+<li><p><a class="reference external" href="https://www.php.net/ctype">ctype</a> To check the type of strings</p></li>
+</ul>
+</li>
+</ul>
+</li>
+<li><p>The <a class="reference external" href="https://www.php.net/mbstring">mbstring</a> extension (see <a class="reference internal" href="glossary.html#term-mbstring"><span class="xref std std-term">mbstring</span></a>) is strongly recommended
+for performance reasons.</p></li>
+<li><p>To support uploading of ZIP files, you need the PHP <a class="reference external" href="https://www.php.net/zip">zip</a> extension.</p></li>
+<li><p>You need <a class="reference external" href="https://www.php.net/gd">GD2</a> support in PHP to display inline thumbnails of JPEGs
+(<code class="docutils literal notranslate"><span class="pre">&quot;image/jpeg:</span> <span class="pre">inline&quot;</span></code>) with their original aspect ratio.</p></li>
+<li><p>When using the cookie authentication (the default), the <a class="reference external" href="https://www.php.net/openssl">openssl</a> extension is strongly suggested.</p></li>
+<li><p>To support upload progress bars, see <a class="reference internal" href="faq.html#faq2-9"><span class="std std-ref">2.9 Seeing an upload progress bar</span></a>.</p></li>
+<li><p>To support XML and Open Document Spreadsheet importing, you need the
+<a class="reference external" href="https://www.php.net/libxml">libxml</a> extension.</p></li>
+<li><p>To support reCAPTCHA on the login page, you need the
+<a class="reference external" href="https://www.php.net/openssl">openssl</a> extension.</p></li>
+<li><p>To support displaying phpMyAdmin’s latest version, you need to enable
+<code class="docutils literal notranslate"><span class="pre">allow_url_open</span></code> in your <code class="file docutils literal notranslate"><span class="pre">php.ini</span></code> or to have the
+<a class="reference external" href="https://www.php.net/curl">curl</a> extension.</p></li>
+</ul>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p><a class="reference internal" href="faq.html#faq1-31"><span class="std std-ref">1.31 Which PHP versions does phpMyAdmin support?</span></a>, <a class="reference internal" href="setup.html#authentication-modes"><span class="std std-ref">Using authentication modes</span></a></p>
+</div>
+</section>
+<section id="database">
+<h2>Database<a class="headerlink" href="#database" title="Link to this heading"></a></h2>
+<p>phpMyAdmin supports MySQL-compatible databases.</p>
+<ul class="simple">
+<li><p>MySQL 5.5 or newer</p></li>
+<li><p>MariaDB 5.5 or newer</p></li>
+</ul>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<p><a class="reference internal" href="faq.html#faq1-17"><span class="std std-ref">1.17 Which Database versions does phpMyAdmin support?</span></a></p>
+</div>
+</section>
+<section id="web-browser">
+<h2>Web browser<a class="headerlink" href="#web-browser" title="Link to this heading"></a></h2>
+<p>To access phpMyAdmin you need a web browser with cookies and JavaScript
+enabled.</p>
+<p>You need a browser which is supported by Bootstrap 4.5, see
+&lt;<a class="reference external" href="https://getbootstrap.com/docs/4.5/getting-started/browsers-devices/">https://getbootstrap.com/docs/4.5/getting-started/browsers-devices/</a>&gt;.</p>
+<div class="versionchanged">
+<p><span class="versionmodified changed">Changed in version 5.2.0: </span>You need a browser which is supported by Bootstrap 5.0, see
+&lt;<a class="reference external" href="https://getbootstrap.com/docs/5.0/getting-started/browsers-devices/">https://getbootstrap.com/docs/5.0/getting-started/browsers-devices/</a>&gt;.</p>
+</div>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="intro.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="setup.html" class="btn btn-neutral float-right" title="Installation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; <a href="copyright.html">Copyright</a> 2012 - 2026, The phpMyAdmin devel team.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

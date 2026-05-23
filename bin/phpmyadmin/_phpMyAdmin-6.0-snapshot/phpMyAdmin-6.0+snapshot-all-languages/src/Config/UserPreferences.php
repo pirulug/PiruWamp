@@ -1,0 +1,308 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PhpMyAdmin\Config;
+
+use PhpMyAdmin\Config;
+use PhpMyAdmin\Config\Forms\User\UserFormList;
+use PhpMyAdmin\ConfigStorage\Relation;
+use PhpMyAdmin\Core;
+use PhpMyAdmin\Current;
+use PhpMyAdmin\Dbal\ConnectionType;
+use PhpMyAdmin\Dbal\DatabaseInterface;
+use PhpMyAdmin\Identifiers\DatabaseName;
+use PhpMyAdmin\Message;
+use PhpMyAdmin\Template;
+use PhpMyAdmin\Url;
+use PhpMyAdmin\Util;
+use Psr\Clock\ClockInterface;
+
+use function __;
+use function array_flip;
+use function array_merge;
+use function htmlspecialchars;
+use function http_build_query;
+use function is_array;
+use function is_int;
+use function is_numeric;
+use function json_decode;
+use function json_encode;
+use function str_contains;
+use function urlencode;
+
+/**
+ * Functions for displaying user preferences pages
+ */
+readonly class UserPreferences
+{
+    public function __construct(
+        private DatabaseInterface $dbi,
+        private Relation $relation,
+        private Template $template,
+        private Config $config,
+        private ClockInterface $clock,
+    ) {
+    }
+
+    /**
+     * Common initialization for user preferences modification pages
+     *
+     * @param ConfigFile $configFile Config file instance
+     */
+    public function pageInit(ConfigFile $configFile): void
+    {
+        $formsAllKeys = UserFormList::getFields();
+        $configFile->resetConfigData(); // start with a clean instance
+        $configFile->setAllowedKeys($formsAllKeys);
+        $configFile->setCfgUpdateReadMapping(
+            ['Server/hide_db' => 'Servers/1/hide_db', 'Server/only_db' => 'Servers/1/only_db'],
+        );
+        $configFile->updateWithGlobalConfig($this->config->settings);
+    }
+
+    /**
+     * Loads user preferences
+     *
+     * Returns an array:
+     * * config_data - path => value pairs
+     * * mtime - last modification time
+     * * type - 'db' (config read from pmadb) or 'session' (read from user session)
+     *
+     * @psalm-return array{config_data: mixed[], mtime: int, type: 'session'|'db'}
+     */
+    public function load(): array
+    {
+        $relationParameters = $this->relation->getRelationParameters();
+        if ($relationParameters->userPreferencesFeature === null) {
+            $currentTimestamp = $this->clock->now()->getTimestamp();
+            // no pmadb table, use session storage
+            if (! isset($_SESSION['userconfig']) || ! is_array($_SESSION['userconfig'])) {
+                $_SESSION['userconfig'] = ['db' => [], 'ts' => $currentTimestamp];
+            }
+
+            $configData = $_SESSION['userconfig']['db'] ?? null;
+            $timestamp = $_SESSION['userconfig']['ts'] ?? null;
+
+            return [
+                'config_data' => is_array($configData) ? $configData : [],
+                'mtime' => is_int($timestamp) ? $timestamp : $currentTimestamp,
+                'type' => 'session',
+            ];
+        }
+
+        // load configuration from pmadb
+        $queryTable = Util::backquote($relationParameters->userPreferencesFeature->database) . '.'
+            . Util::backquote($relationParameters->userPreferencesFeature->userConfig);
+        $query = 'SELECT `config_data`, UNIX_TIMESTAMP(`timevalue`) ts'
+            . ' FROM ' . $queryTable
+            . ' WHERE `username` = '
+            . $this->dbi->quoteString((string) $relationParameters->user);
+        $row = $this->dbi->fetchSingleRow($query, DatabaseInterface::FETCH_ASSOC, ConnectionType::ControlUser);
+        if ($row === [] || ! isset($row['config_data']) || ! isset($row['ts'])) {
+            return ['config_data' => [], 'mtime' => $this->clock->now()->getTimestamp(), 'type' => 'db'];
+        }
+
+        $configData = json_decode($row['config_data'], true);
+
+        return [
+            'config_data' => is_array($configData) ? $configData : [],
+            'mtime' => is_numeric($row['ts']) ? (int) $row['ts'] : $this->clock->now()->getTimestamp(),
+            'type' => 'db',
+        ];
+    }
+
+    /**
+     * Saves user preferences
+     *
+     * @param mixed[] $configArray configuration array
+     */
+    public function save(array $configArray): true|Message
+    {
+        // Smart merge: If this looks like a partial save (missing 2fa but we have it stored),
+        // automatically merge to prevent accidental overwrites
+        if (! isset($configArray['2fa'])) {
+            $existingPrefs = $this->load();
+            if (isset($existingPrefs['config_data']['2fa'])) {
+                // This is likely a partial save from page settings - merge to preserve 2fa
+                $configArray['2fa'] = $existingPrefs['config_data']['2fa'];
+            }
+        }
+
+        $relationParameters = $this->relation->getRelationParameters();
+        $cacheKey = 'server_' . Current::$server;
+        if (
+            $relationParameters->userPreferencesFeature === null
+            || $relationParameters->user === null
+            || $relationParameters->db === null
+        ) {
+            // no pmadb table, use session storage
+            $_SESSION['userconfig'] = ['db' => $configArray, 'ts' => $this->clock->now()->getTimestamp()];
+            if (isset($_SESSION['cache'][$cacheKey]['userprefs'])) {
+                unset($_SESSION['cache'][$cacheKey]['userprefs']);
+            }
+
+            return true;
+        }
+
+        // save configuration to pmadb
+        $queryTable = Util::backquote($relationParameters->userPreferencesFeature->database) . '.'
+            . Util::backquote($relationParameters->userPreferencesFeature->userConfig);
+        $query = 'SELECT `username` FROM ' . $queryTable
+            . ' WHERE `username` = '
+            . $this->dbi->quoteString($relationParameters->user);
+
+        $hasConfig = $this->dbi->fetchValue($query, 0, ConnectionType::ControlUser);
+        $configData = json_encode($configArray);
+        if ($hasConfig) {
+            $query = 'UPDATE ' . $queryTable
+                . ' SET `timevalue` = NOW(), `config_data` = '
+                . $this->dbi->quoteString($configData)
+                . ' WHERE `username` = '
+                . $this->dbi->quoteString($relationParameters->user);
+        } else {
+            $query = 'INSERT INTO ' . $queryTable
+                . ' (`username`, `timevalue`,`config_data`) '
+                . 'VALUES ('
+                . $this->dbi->quoteString($relationParameters->user) . ', NOW(), '
+                . $this->dbi->quoteString($configData) . ')';
+        }
+
+        if (isset($_SESSION['cache'][$cacheKey]['userprefs'])) {
+            unset($_SESSION['cache'][$cacheKey]['userprefs']);
+        }
+
+        if (! $this->dbi->tryQuery($query, ConnectionType::ControlUser)) {
+            $message = Message::error(__('Could not save configuration'));
+            $message->addMessage(
+                Message::error($this->dbi->getError(ConnectionType::ControlUser)),
+                '<br><br>',
+            );
+            if (! $this->hasAccessToDatabase($relationParameters->db)) {
+                /**
+                 * When phpMyAdmin cached the configuration storage parameters, it checked if the database can be
+                 * accessed, so if it could not be accessed anymore, then the cache must be cleared as it's out of date.
+                 */
+                $message->addMessage(Message::error(htmlspecialchars(
+                    __('The phpMyAdmin configuration storage database could not be accessed.'),
+                )), '<br><br>');
+            }
+
+            return $message;
+        }
+
+        return true;
+    }
+
+    private function hasAccessToDatabase(DatabaseName $database): bool
+    {
+        $query = 'SELECT SCHEMA_NAME FROM INFORMATION_SCHEMA.SCHEMATA WHERE SCHEMA_NAME = '
+            . $this->dbi->quoteString($database->getName());
+        if ($this->config->selectedServer['DisableIS']) {
+            $query = 'SHOW DATABASES LIKE '
+                . $this->dbi->quoteString(
+                    $this->dbi->escapeMysqlWildcards($database->getName()),
+                );
+        }
+
+        return $this->dbi->fetchSingleRow($query, 'ASSOC', ConnectionType::ControlUser) !== [];
+    }
+
+    /**
+     * Returns a user preferences array filtered by $cfg['UserprefsDisallow']
+     * (exclude list) and keys from user preferences form (allow list)
+     *
+     * @param mixed[] $configData path => value pairs
+     *
+     * @return mixed[]
+     */
+    public function apply(array $configData): array
+    {
+        $cfg = [];
+        $excludeList = array_flip($this->config->config->UserprefsDisallow);
+        $allowList = array_flip(UserFormList::getFields());
+        // allow some additional fields which are custom handled
+        $allowList['ThemeDefault'] = true;
+        $allowList['lang'] = true;
+        $allowList['Server/hide_db'] = true;
+        $allowList['Server/only_db'] = true;
+        $allowList['2fa'] = true;
+        foreach ($configData as $path => $value) {
+            if (! isset($allowList[$path]) || isset($excludeList[$path])) {
+                continue;
+            }
+
+            Core::arrayWrite($path, $cfg, $value);
+        }
+
+        return $cfg;
+    }
+
+    /**
+     * Updates one user preferences option (loads and saves to database).
+     *
+     * No validation is done!
+     *
+     * @param string $path         configuration
+     * @param mixed  $value        value
+     * @param mixed  $defaultValue default value
+     */
+    public function persistOption(string $path, mixed $value, mixed $defaultValue): true|Message
+    {
+        $prefs = $this->load();
+        if ($value === $defaultValue) {
+            if (! isset($prefs['config_data'][$path])) {
+                return true;
+            }
+
+            unset($prefs['config_data'][$path]);
+        } else {
+            $prefs['config_data'][$path] = $value;
+        }
+
+        return $this->save($prefs['config_data']);
+    }
+
+    /**
+     * Get URL to redirect after saving new user preferences.
+     *
+     * @param string       $fileName Filename
+     * @param mixed[]|null $params   URL parameters
+     * @param string|null  $hash     Hash value
+     *
+     * @return non-empty-string
+     */
+    public function getUrlToRedirect(string $fileName, array|null $params = null, string|null $hash = null): string
+    {
+        $urlParams = ['saved' => 1];
+        if (is_array($params)) {
+            $urlParams = array_merge($params, $urlParams);
+        }
+
+        if ($hash !== null && $hash !== '') {
+            $hash = '#' . urlencode($hash);
+        }
+
+        return './' . $fileName . Url::getCommonRaw($urlParams, ! str_contains($fileName, '?') ? '?' : '&') . $hash;
+    }
+
+    /**
+     * Shows form which allows to quickly load
+     * settings stored in browser's local storage
+     */
+    public function autoloadGetHeader(): string
+    {
+        if (isset($_REQUEST['prefs_autoload']) && $_REQUEST['prefs_autoload'] === 'hide') {
+            $_SESSION['userprefs_autoload'] = true;
+
+            return '';
+        }
+
+        $returnUrl = '?' . http_build_query($_GET, '', '&');
+
+        return $this->template->render('preferences/autoload', [
+            'hidden_inputs' => Url::getHiddenInputs(),
+            'return_url' => $returnUrl,
+        ]);
+    }
+}

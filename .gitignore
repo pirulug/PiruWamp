@@ -9,8 +9,7 @@ __pycache__/
 *.spec
 
 # Ejecutables
-*.exe
-*.dll
+piruwamp.exe
 
 # Logs de la aplicación
 *.log

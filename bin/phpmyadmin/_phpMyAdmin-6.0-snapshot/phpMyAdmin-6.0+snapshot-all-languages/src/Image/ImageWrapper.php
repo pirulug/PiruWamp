@@ -1,0 +1,171 @@
+<?php
+
+declare(strict_types=1);
+
+namespace PhpMyAdmin\Image;
+
+use GdImage;
+
+use function extension_loaded;
+use function function_exists;
+use function imagearc;
+use function imagecolorallocate;
+use function imagecopyresampled;
+use function imagecreatefromstring;
+use function imagecreatetruecolor;
+use function imagefilledpolygon;
+use function imagefilledrectangle;
+use function imagejpeg;
+use function imageline;
+use function imagepng;
+use function imagestring;
+use function imagesx;
+use function imagesy;
+
+final readonly class ImageWrapper
+{
+    private function __construct(public GdImage $image)
+    {
+    }
+
+    /**
+     * @param int<1, max>                                                         $width
+     * @param int<1, max>                                                         $height
+     * @param array{red: int<0, 255>, green: int<0, 255>, blue: int<0, 255>}|null $background
+     */
+    public static function create(int $width, int $height, array|null $background = null): self|null
+    {
+        if (! extension_loaded('gd')) {
+            return null; // @codeCoverageIgnore
+        }
+
+        $image = imagecreatetruecolor($width, $height);
+        if ($image === false) {
+            return null; // @codeCoverageIgnore
+        }
+
+        if ($background === null) {
+            return new self($image);
+        }
+
+        $backgroundColor = imagecolorallocate($image, $background['red'], $background['green'], $background['blue']);
+        if ($backgroundColor === false) {
+            return null; // @codeCoverageIgnore
+        }
+
+        if (! imagefilledrectangle($image, 0, 0, $width - 1, $height - 1, $backgroundColor)) {
+            return null; // @codeCoverageIgnore
+        }
+
+        return new self($image);
+    }
+
+    public static function fromString(string $data): self|null
+    {
+        if (! extension_loaded('gd')) {
+            return null; // @codeCoverageIgnore
+        }
+
+        $image = imagecreatefromstring($data);
+        if ($image === false) {
+            return null;
+        }
+
+        return new self($image);
+    }
+
+    public function arc(
+        int $centerX,
+        int $centerY,
+        int $width,
+        int $height,
+        int $startAngle,
+        int $endAngle,
+        int $color,
+    ): bool {
+        return imagearc($this->image, $centerX, $centerY, $width, $height, $startAngle, $endAngle, $color);
+    }
+
+    /**
+     * @param int<0, 255> $red
+     * @param int<0, 255> $green
+     * @param int<0, 255> $blue
+     */
+    public function colorAllocate(int $red, int $green, int $blue): int|false
+    {
+        return imagecolorallocate($this->image, $red, $green, $blue);
+    }
+
+    public function copyResampled(
+        ImageWrapper $sourceImage,
+        int $destinationX,
+        int $destinationY,
+        int $sourceX,
+        int $sourceY,
+        int $destinationWidth,
+        int $destinationHeight,
+        int $sourceWidth,
+        int $sourceHeight,
+    ): bool {
+        return imagecopyresampled(
+            $this->image,
+            $sourceImage->image,
+            $destinationX,
+            $destinationY,
+            $sourceX,
+            $sourceY,
+            $destinationWidth,
+            $destinationHeight,
+            $sourceWidth,
+            $sourceHeight,
+        );
+    }
+
+    /** @param list<int> $points */
+    public function filledPolygon(array $points, int $color): bool
+    {
+        return imagefilledpolygon($this->image, $points, $color);
+    }
+
+    /** @return int<1, max> */
+    public function height(): int
+    {
+        return imagesy($this->image);
+    }
+
+    /** @param resource|string|null $file */
+    public function jpeg($file = null, int $quality = -1): bool
+    {
+        if (! function_exists('imagejpeg')) {
+            return false; // @codeCoverageIgnore
+        }
+
+        return imagejpeg($this->image, $file, $quality);
+    }
+
+    public function line(int $x1, int $y1, int $x2, int $y2, int $color): bool
+    {
+        return imageline($this->image, $x1, $y1, $x2, $y2, $color);
+    }
+
+    /** @param resource|string|null $file */
+    public function png($file = null, int $quality = -1, int $filters = -1): bool
+    {
+        if (! function_exists('imagepng')) {
+            return false; // @codeCoverageIgnore
+        }
+
+        return imagepng($this->image, $file, $quality, $filters);
+    }
+
+    public function string(int $font, int $x, int $y, string $string, int $color): bool
+    {
+        return imagestring($this->image, $font, $x, $y, $string, $color);
+    }
+
+    /** @return int<1, max> */
+    public function width(): int
+    {
+        return imagesx($this->image);
+    }
+}

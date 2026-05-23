@@ -1,0 +1,114 @@
+<?php
+
+use Twig\Environment;
+use Twig\Error\LoaderError;
+use Twig\Error\RuntimeError;
+use Twig\Extension\CoreExtension;
+use Twig\Extension\SandboxExtension;
+use Twig\Markup;
+use Twig\Sandbox\SecurityError;
+use Twig\Sandbox\SecurityNotAllowedTagError;
+use Twig\Sandbox\SecurityNotAllowedFilterError;
+use Twig\Sandbox\SecurityNotAllowedFunctionError;
+use Twig\Source;
+use Twig\Template;
+use Twig\TemplateWrapper;
+
+/* login/twofactor/application_configure.twig */
+class __TwigTemplate_cc9a4cfee96f495d5e9fc2279c97ec70 extends Template
+{
+    private Source $source;
+    /**
+     * @var array<string, Template>
+     */
+    private array $macros = [];
+
+    public function __construct(Environment $env)
+    {
+        parent::__construct($env);
+
+        $this->source = $this->getSourceContext();
+
+        $this->parent = false;
+
+        $this->blocks = [
+        ];
+    }
+
+    protected function doDisplay(array $context, array $blocks = []): iterable
+    {
+        $macros = $this->macros;
+        // line 1
+        yield PhpMyAdmin\Url::getHiddenInputs();
+        yield "
+<p>
+    ";
+        // line 3
+        yield $this->env->getRuntime('Twig\Runtime\EscaperRuntime')->escape(\_gettext("Please scan following QR code into the two-factor authentication app on your device and enter authentication code it generates."), "html", null, true);
+        yield "
+</p>
+<p>
+    ";
+        // line 6
+        if ((($tmp = ($context["has_imagick"] ?? null)) && $tmp instanceof Markup ? (string) $tmp : $tmp)) {
+            // line 7
+            yield "        <img src=\"";
+            yield $this->env->getRuntime('Twig\Runtime\EscaperRuntime')->escape(($context["image"] ?? null), "html", null, true);
+            yield "\">
+    ";
+        } else {
+            // line 9
+            yield "        ";
+            yield ($context["image"] ?? null);
+            yield "
+    ";
+        }
+        // line 11
+        yield "</p>
+<p>
+    ";
+        // line 13
+        yield $this->env->getRuntime('Twig\Runtime\EscaperRuntime')->escape(\_gettext("Secret/key:"), "html", null, true);
+        yield " <strong>";
+        yield $this->env->getRuntime('Twig\Runtime\EscaperRuntime')->escape(($context["secret"] ?? null), "html", null, true);
+        yield "</strong>
+</p>
+<p>
+    <label>";
+        // line 16
+        yield $this->env->getRuntime('Twig\Runtime\EscaperRuntime')->escape(\_gettext("Authentication code:"), "html", null, true);
+        yield " <input type=\"text\" name=\"2fa_code\" autocomplete=\"off\"></label>
+</p>
+";
+        yield from [];
+    }
+
+    /**
+     * @codeCoverageIgnore
+     */
+    public function getTemplateName(): string
+    {
+        return "login/twofactor/application_configure.twig";
+    }
+
+    /**
+     * @codeCoverageIgnore
+     */
+    public function isTraitable(): bool
+    {
+        return false;
+    }
+
+    /**
+     * @codeCoverageIgnore
+     */
+    public function getDebugInfo(): array
+    {
+        return array (  79 => 16,  71 => 13,  67 => 11,  61 => 9,  55 => 7,  53 => 6,  47 => 3,  42 => 1,);
+    }
+
+    public function getSourceContext(): Source
+    {
+        return new Source("", "login/twofactor/application_configure.twig", "/mnt/storage/phpmyadmin.git/release/phpMyAdmin-6.0+snapshot/resources/templates/login/twofactor/application_configure.twig");
+    }
+}
