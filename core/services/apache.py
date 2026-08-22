@@ -133,8 +133,38 @@ KeepAliveTimeout 5
         try:
             formatted_dll = php_dll.replace("\\", "/")
             formatted_php = php_path.replace("\\", "/")
+
+            # Detectar y pre-cargar librerías de dependencias requeridas en Windows (libsodium, openssl, etc.)
+            load_file_lines = []
+            if os.path.exists(php_path):
+                # Priorizar libcrypto, libssl y libsodium
+                priority_libs = ["libcrypto", "libssl", "libsodium", "libssh2", "libsqlite3"]
+                all_dlls = [f for f in os.listdir(php_path) if f.lower().endswith(".dll")]
+                
+                # Primero las prioritarias
+                for prefix in priority_libs:
+                    for f in all_dlls:
+                        if f.lower().startswith(prefix):
+                            full_path = os.path.join(php_path, f).replace("\\", "/")
+                            line = f'LoadFile "{full_path}"'
+                            if line not in load_file_lines:
+                                load_file_lines.append(line)
+
+                # Luego cualquier otra librería lib*.dll o icu*.dll
+                for f in all_dlls:
+                    f_lower = f.lower()
+                    if (f_lower.startswith("lib") or f_lower.startswith("icu") or f_lower.startswith("glib")) and not f_lower.startswith("php"):
+                        full_path = os.path.join(php_path, f).replace("\\", "/")
+                        line = f'LoadFile "{full_path}"'
+                        if line not in load_file_lines:
+                            load_file_lines.append(line)
+
+            load_file_block = "\n".join(load_file_lines)
+            if load_file_block:
+                load_file_block += "\n"
+
             new_content = f"""# This file is auto-generated, so please keep it intact.
-LoadModule {module_name} "{formatted_dll}"
+{load_file_block}LoadModule {module_name} "{formatted_dll}"
 PHPIniDir "{formatted_php}"
 <IfModule mime_module>
     AddType application/x-httpd-php .php
@@ -143,64 +173,79 @@ PHPIniDir "{formatted_php}"
             with open(mod_php_conf, "w", encoding="utf-8") as f:
                 f.write(new_content)
             logger.log(f"mod_php.conf actualizado ({module_name}) con PHP en {os.path.basename(php_path)}", self.name)
+
         except Exception as e:
             logger.log(f"Error actualizando mod_php.conf: {e}", self.name)
 
     def _update_extra_confs(self):
         alias_dir = os.path.join(config.wamp_root, "etc", "apache2", "alias")
         sites_dir = os.path.join(config.wamp_root, "etc", "apache2", "sites-enabled")
-        www_dir = config.www_path.replace("\\", "/")
+        os.makedirs(alias_dir, exist_ok=True)
+        os.makedirs(sites_dir, exist_ok=True)
 
-        def normalize_paths(content: str) -> str:
-            pma_path = config.phpmyadmin_path.replace("\\", "/").rstrip("/")
-            current_www_dir = www_dir.rstrip("/")
-            
-            # Actualizar Alias de phpMyAdmin
-            content = re.sub(
-                r'Alias\s+/phpmyadmin\s+"[^"]*"',
-                f'Alias /phpmyadmin "{pma_path}/"',
-                content, flags=re.IGNORECASE
-            )
-            # Actualizar Directory de phpMyAdmin
-            content = re.sub(
-                r'<Directory\s+"[^"]*phpmyadmin[^"]*">',
-                f'<Directory "{pma_path}/">',
-                content, flags=re.IGNORECASE
-            )
-            # Actualizar Alias de PiruWamp Web Dashboard
-            web_path = os.path.join(config.wamp_root, "app", "web").replace("\\", "/").rstrip("/")
-            content = re.sub(
-                r'Alias\s+/piruwamp\s+"[^"]*"',
-                f'Alias /piruwamp "{web_path}/"',
-                content, flags=re.IGNORECASE
-            )
-            content = re.sub(
-                r'Alias\s+/piruwam\s+"[^"]*"',
-                f'Alias /piruwam "{web_path}/"',
-                content, flags=re.IGNORECASE
-            )
-            content = re.sub(
-                r'<Directory\s+"[^"]*app/web[^"]*">',
-                f'<Directory "{web_path}/">',
-                content, flags=re.IGNORECASE
-            )
-            # Actualizar rutas de www
-            content = re.sub(
-                r'C:[\\/][^"]*[\\/]www[\\/]*',
-                current_www_dir + "/", content, flags=re.IGNORECASE
-            )
+        pma_path = config.phpmyadmin_path.replace("\\", "/").rstrip("/")
+        web_path = os.path.join(config.wamp_root, "app", "web").replace("\\", "/").rstrip("/")
+        www_dir = config.www_path.replace("\\", "/").rstrip("/")
+
+        # 1. Generar dinamicamente alias phpmyadmin.conf
+        pma_conf = os.path.join(alias_dir, "phpmyadmin.conf")
+        pma_content = f"""Alias /phpmyadmin "{pma_path}/"
+<Directory "{pma_path}/">
+    Options Indexes FollowSymLinks MultiViews
+    AllowOverride All
+    Require all granted
+</Directory>
+"""
+        try:
+            with open(pma_conf, "w", encoding="utf-8") as f:
+                f.write(pma_content)
+        except Exception as e:
+            logger.log(f"Error escribiendo {pma_conf}: {e}", self.name)
+
+        # 2. Generar dinamicamente alias piruwamp.localhost.conf
+        piru_conf = os.path.join(alias_dir, "piruwamp.localhost.conf")
+        piru_content = f"""Alias /piruwamp "{web_path}/"
+Alias /piruwam "{web_path}/"
+<Directory "{web_path}/">
+    Options Indexes FollowSymLinks MultiViews
+    AllowOverride All
+    Require all granted
+</Directory>
+"""
+        try:
+            with open(piru_conf, "w", encoding="utf-8") as f:
+                f.write(piru_content)
+        except Exception as e:
+            logger.log(f"Error escribiendo {piru_conf}: {e}", self.name)
+
+        # 3. Sincronizar sites-enabled dinamicamente con la ruta actual
+        try:
+            from ..managers.vhost import VHostManager
+            from ..managers.hosts import HostsManager
+            VHostManager.sync_sites(HostsManager())
+        except Exception as e:
+            logger.log(f"Error sincronizando sites-enabled: {e}", self.name)
+
+        # 4. Para cualquier otro archivo .conf adicional en alias/ o sites-enabled/
+        def normalize_other_paths(content: str) -> str:
+            content = re.sub(r'[A-Za-z]:[\\/][^"\r\n]*[\\/]www[\\/]*', www_dir + "/", content, flags=re.IGNORECASE)
+            content = re.sub(r'[A-Za-z]:[\\/][^"\r\n]*[\\/]app[\\/]web[\\/]*', web_path + "/", content, flags=re.IGNORECASE)
+            content = re.sub(r'[A-Za-z]:[\\/][^"\r\n]*[\\/]app[\\/]phpmyadmin[\\/]*', pma_path + "/", content, flags=re.IGNORECASE)
             return content
-
 
         for pattern in [os.path.join(alias_dir, "*.conf"), os.path.join(sites_dir, "*.conf")]:
             for file in glob.glob(pattern):
+                if os.path.basename(file) in ["phpmyadmin.conf", "piruwamp.localhost.conf", "00-default.conf", "00-piruwam.localhost.conf"]:
+                    continue
                 try:
                     with open(file, "r", encoding="utf-8") as f:
                         content = f.read()
-                    new_content = normalize_paths(content)
+                    new_content = normalize_other_paths(content)
                     if content != new_content:
                         with open(file, "w", encoding="utf-8") as f:
                             f.write(new_content)
-                        logger.log(f"Configuración actualizada: {os.path.basename(file)}", self.name)
+                        logger.log(f"Configuracion actualizada: {os.path.basename(file)}", self.name)
                 except Exception as e:
                     logger.log(f"Error actualizando {file}: {e}", self.name)
+
+

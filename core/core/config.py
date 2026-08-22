@@ -10,11 +10,13 @@ class Config:
         self.data = self.load_config()
 
     def _get_root_path(self):
-        if getattr(sys, 'frozen', False):
-            return os.path.dirname(sys.executable)
+        if getattr(sys, "frozen", False):
+            return os.path.dirname(os.path.abspath(sys.executable))
         else:
-            # Si se ejecuta desde la carpeta raíz del proyecto
-            return os.getcwd()
+            # Subir desde core/core/config.py a la raiz del proyecto
+            curr_dir = os.path.dirname(os.path.abspath(__file__))
+            root_dir = os.path.dirname(os.path.dirname(curr_dir))
+            return root_dir
 
     def load_config(self):
         config_path = os.path.join(self.wamp_root, CONFIG_FILE)
@@ -37,13 +39,17 @@ class Config:
                             else:
                                 data[k] = v
                 
-                # Asegurar que wamp_root sea correcto
-                data["wamp_root"] = self.wamp_root
+                # Asegurar que wamp_root sea correcto y se guarde si cambio de ruta
+                if data.get("wamp_root") != self.wamp_root:
+                    data["wamp_root"] = self.wamp_root
+                    self.save_config(data)
+                
                 if "php_extensions" not in data:
                     data["php_extensions"] = []
                 return data
             except Exception as e:
                 print(f"Error loading config: {e}")
+
         
         # Si no existe o hay error, guardar el default
         self.save_config(default_config)
@@ -101,6 +107,12 @@ class Config:
     def set_apache_version(self, version):
         self.data["apache_version"] = version
         self.save_config()
+        try:
+            from ..services.apache import ApacheService
+            apache_svc = ApacheService()
+            apache_svc.update_configs()
+        except Exception:
+            pass
 
     @property
     def mariadb_exe(self):
@@ -148,6 +160,12 @@ class Config:
     def set_mariadb_version(self, version):
         self.data["mariadb_version"] = version
         self.save_config()
+        try:
+            from ..services.mariadb import MariaDBService
+            mariadb_svc = MariaDBService()
+            mariadb_svc.update_config()
+        except Exception:
+            pass
 
     @property
     def www_path(self):
@@ -189,6 +207,40 @@ class Config:
         # 4. Sincronizar extensiones desde el config
         if exts:
             PHPManager.sync_extensions(exts)
+
+        # 5. Actualizar configuracion de Apache (mod_php.conf y httpd.conf)
+        try:
+            from ..services.apache import ApacheService
+            apache_svc = ApacheService()
+            apache_svc.update_configs()
+        except Exception:
+            pass
+
+    def sync_all_services(self):
+        """Sincroniza y actualiza las configuraciones y rutas de todos los servicios."""
+        try:
+            from ..managers.php_manager import PHPManager
+            from ..services.apache import ApacheService
+            from ..services.mariadb import MariaDBService
+            from ..managers.vhost import VHostManager
+            from ..managers.hosts import HostsManager
+
+            self.save_config()
+            PHPManager.update_php_ini()
+            if self.php_extensions:
+                PHPManager.sync_extensions(self.php_extensions)
+
+            mariadb_svc = MariaDBService()
+            mariadb_svc.update_config()
+
+            apache_svc = ApacheService()
+            apache_svc.update_configs()
+
+            hosts_mgr = HostsManager()
+            VHostManager.sync_sites(hosts_mgr)
+        except Exception as e:
+            print(f"Error sincronizando todos los servicios: {e}")
+
 
     @property
     def active_phpmyadmin_version(self):

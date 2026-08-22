@@ -31,7 +31,28 @@ class VHostManager:
         sites_dir = cls.get_sites_enabled_dir()
         www_path = config.www_path
         
-        # Asegurar VirtualHost para piruwam.localhost apuntando a app/web
+        # 1. Asegurar 00-default.conf apuntando a la ruta www actual
+        formatted_www = www_path.replace("\\", "/")
+        default_conf = os.path.join(sites_dir, "00-default.conf")
+        default_vhost = f"""
+<VirtualHost *:80>
+    ServerName localhost
+    ServerAlias 127.0.0.1
+    DocumentRoot "{formatted_www}"
+    <Directory "{formatted_www}/">
+        Options Indexes FollowSymLinks MultiViews
+        AllowOverride All
+        Require all granted
+    </Directory>
+</VirtualHost>
+""".strip()
+        try:
+            with open(default_conf, "w", encoding="utf-8") as f:
+                f.write(default_vhost)
+        except Exception as e:
+            logger.log(f"Error actualizando 00-default.conf: {e}", "Sites")
+
+        # 2. Asegurar VirtualHost para piruwam.localhost apuntando a app/web actual
         web_path = os.path.join(config.wamp_root, "app", "web").replace("\\", "/")
         dashboard_conf = os.path.join(sites_dir, "00-piruwam.localhost.conf")
         dashboard_vhost = f"""
@@ -55,22 +76,20 @@ class VHostManager:
         if hasattr(hosts_manager, "ensure_dashboard_hosts"):
             hosts_manager.ensure_dashboard_hosts()
 
-
-
         if not os.path.exists(www_path):
             return
 
         www_folders = {f for f in os.listdir(www_path) if os.path.isdir(os.path.join(www_path, f))}
 
-        # Crear o actualizar vhosts de proyectos de usuario
+        # 3. Crear o actualizar vhosts de proyectos de usuario
         for folder in www_folders:
             conf_file = os.path.join(sites_dir, f"auto.{folder}.test.conf")
-            if not os.path.exists(conf_file):
-                with open(conf_file, "w", encoding="utf-8") as f:
-                    f.write(cls.generate_vhost_config(folder))
-                logger.log(f"Creado vhost para {folder}", "Sites")
+            # Siempre re-escribir para garantizar que la ruta absoluta coincida con la ruta actual
+            with open(conf_file, "w", encoding="utf-8") as f:
+                f.write(cls.generate_vhost_config(folder))
             
             hosts_manager.add_to_hosts(folder)
+
 
         # Limpiar vhosts antiguos
         for file in os.listdir(sites_dir):

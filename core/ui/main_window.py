@@ -62,10 +62,20 @@ class MainWindow:
             self._post_init_setup()
 
     def _post_init_setup(self):
-        # Sync projects on start
+        # 1. Actualizar dinamicamente todas las rutas de configuracion en cada apertura
+        try:
+            from ..managers.php_manager import PHPManager
+            PHPManager.update_php_ini()
+            self.mariadb.update_config()
+            self.apache.update_configs()
+        except Exception as e:
+            logger.log(f"Error actualizando rutas al iniciar: {e}", "System")
+
+        # 2. Sincronizar sitios virtuales y menus
         self.vhost_manager.sync_sites(self.hosts_manager)
         self.update_projects_menu()
         self.update_php_extensions_menu()
+
 
     def _on_setup_complete(self):
         self.apache = ApacheService()
