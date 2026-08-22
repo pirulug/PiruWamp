@@ -2,23 +2,28 @@ import os
 import shutil
 import subprocess
 import sys
+import fnmatch
 
 def main():
-    print("Iniciando compilacion de PiruWamp...")
+    print("Iniciando construccion y empaquetado de PiruWamp en _build...")
     
-    # 1. Definir rutas en la carpeta .compile
+    # 1. Rutas de construccion
     compile_dir = ".compile"
     work_dir = os.path.join(compile_dir, "build")
     dist_dir = os.path.join(compile_dir, "dist")
     spec_dir = compile_dir
+    build_dest = "_build"
     
-    # Asegurar que existe la carpeta de destino de compilacion
+    # Asegurar que existe la carpeta temporal de compilacion
     os.makedirs(compile_dir, exist_ok=True)
     
     # 2. Comando PyInstaller con rutas absolutas para manifest e icon
     manifest_path = os.path.abspath("app.manifest")
-    icon_path = os.path.abspath("icon.ico")
+    icon_path = os.path.abspath(os.path.join("core", "img", "icon.ico"))
+    if not os.path.exists(icon_path):
+        icon_path = os.path.abspath("icon.ico")
     main_path = os.path.abspath("piruwamp.py")
+
 
     cmd = [
         sys.executable, "-m", "PyInstaller",
@@ -41,72 +46,111 @@ def main():
         print("Error: La compilacion con PyInstaller fallo.")
         sys.exit(result.returncode)
         
-    # 3. Copiar el ejecutable piruwamp.exe a la raiz
     src_exe = os.path.join(dist_dir, "piruwamp.exe")
-    dest_exe = "piruwamp.exe"
     
-    if os.path.exists(src_exe):
-        print(f"Copiando {src_exe} a la raiz ({dest_exe})...")
-        try:
-            shutil.copy2(src_exe, dest_exe)
-        except Exception as e:
-            print(f"Error copiando el archivo exe a la raiz: {e}")
-            sys.exit(1)
-            
-        # 4. Crear/Limpiar la carpeta .build y copiar archivos necesarios
-        build_dest = ".build"
-        if os.path.exists(build_dest):
-            print(f"Limpiando carpeta anterior {build_dest}...")
-            try:
-                shutil.rmtree(build_dest)
-            except Exception as e:
-                print(f"Advertencia al eliminar {build_dest}: {e}")
-                
-        print(f"Copiando archivos necesarios a la carpeta {build_dest}...")
-        try:
-            # Excluimos código fuente, especificaciones de PyInstaller y carpetas de desarrollo
-            # Y en bin, solo copiamos las carpetas de versión que empiezan con '_'
-            import fnmatch
-            
-            def ignore_patterns(path, names):
-                ignored = set()
-                
-                # Patrones estándar a ignorar en cualquier sitio
-                patterns = [
-                    "*.py", "*.pyc", "__pycache__", ".git", ".gitignore", 
-                    "build.py", "wamp.spec", "main.spec", "piruwamp.spec", ".compile", ".build",
-                    "build", "dist", "*.iss", "wamp.exe", "main.exe", "piruwamp", "core"
-                ]
-                for pattern in patterns:
-                    ignored.update(fnmatch.filter(names, pattern))
-                
-                # Identificar si estamos dentro de bin/apache, bin/mariadb, bin/php, bin/phpmyadmin
-                # Si los binarios se descargan en el primer inicio, ignoramos paquetes instalados en el empaquetado inicial
-                abs_src = os.path.abspath(".")
-                abs_path = os.path.abspath(path)
-                rel_path = os.path.relpath(abs_path, abs_src)
-                parts = rel_path.replace("\\", "/").split("/")
-                
-                if len(parts) == 2 and parts[0] == "bin" and parts[1] in ["apache", "mariadb", "php", "phpmyadmin"]:
-                    for name in names:
-                        full_name_path = os.path.join(path, name)
-                        if os.path.isdir(full_name_path):
-                            ignored.add(name)
-
-                if len(parts) == 2 and parts[0] == "app" and parts[1] == "phpmyadmin":
-                    for name in names:
-                        if name != ".gitignore":
-                            ignored.add(name)
-                                
-                return ignored
-
-            shutil.copytree(".", build_dest, ignore=ignore_patterns, dirs_exist_ok=True)
-            print("¡Compilacion, copiado a la raiz y generacion de la carpeta .build completados con exito!")
-        except Exception as e:
-            print(f"Error al estructurar la carpeta {build_dest}: {e}")
-            sys.exit(1)
-    else:
+    if not os.path.exists(src_exe):
         print(f"Error: No se encontro el ejecutable generado en {src_exe}")
+        sys.exit(1)
+
+    # 3. Limpiar cualquier ejecutable residual en la raiz
+    root_exe = os.path.abspath("piruwamp.exe")
+    if os.path.exists(root_exe):
+        try:
+            os.remove(root_exe)
+        except Exception:
+            pass
+
+    # 4. Limpiar y estructurar la carpeta _build
+    os.makedirs(build_dest, exist_ok=True)
+    print(f"Limpiando y estructurando distribucion limpia en {build_dest}...")
+    for item in os.listdir(build_dest):
+        item_path = os.path.join(build_dest, item)
+        try:
+            if os.path.isdir(item_path):
+                shutil.rmtree(item_path)
+            else:
+                os.remove(item_path)
+        except Exception as e:
+            print(f"Nota al limpiar {item}: {e}")
+
+
+    try:
+        def ignore_patterns(path, names):
+            ignored = set()
+            
+            # Patrones estandar a ignorar
+            patterns = [
+                "*.py", "*.pyc", "__pycache__", ".git", ".gitignore", 
+                "build.py", "clean.py", "wamp.spec", "main.spec", "piruwamp.spec",
+                ".compile", ".build", "_build", "build", "dist",
+                "*.iss", "wamp.exe", "main.exe", "piruwamp", "core",
+                "crash.log", "*.log", "_doc", ".agents", "scratch"
+            ]
+            for pattern in patterns:
+                ignored.update(fnmatch.filter(names, pattern))
+
+            
+            abs_src = os.path.abspath(".")
+            abs_path = os.path.abspath(path)
+            rel_path = os.path.relpath(abs_path, abs_src)
+            parts = rel_path.replace("\\", "/").split("/")
+            
+            # En bin/, no empaquetar versiones descargadas pesadas
+            if len(parts) == 2 and parts[0] == "bin" and parts[1] in ["apache", "mariadb", "php", "phpmyadmin"]:
+                for name in names:
+                    full_name_path = os.path.join(path, name)
+                    if os.path.isdir(full_name_path):
+                        ignored.add(name)
+
+            # En app/, ignorar phpmyadmin desplegado en runtime
+            if len(parts) == 2 and parts[0] == "app" and parts[1] == "phpmyadmin":
+                for name in names:
+                    if name != ".gitignore":
+                        ignored.add(name)
+            elif len(parts) == 1 and parts[0] == "app":
+                if "phpmyadmin" in names:
+                    ignored.add("phpmyadmin")
+
+            # En data/, no empaquetar bases de datos locales
+            if parts[0] == "data":
+                for name in names:
+                    if name != ".gitignore":
+                        ignored.add(name)
+
+            return ignored
+
+        # Copiar estructura base
+        shutil.copytree(".", build_dest, ignore=ignore_patterns, dirs_exist_ok=True)
+
+        # Copiar el ejecutable piruwamp.exe dentro de _build
+        shutil.copy2(src_exe, os.path.join(build_dest, "piruwamp.exe"))
+
+        # Asegurar copia del icono unicamente en la raiz de _build
+        if os.path.exists(icon_path):
+            shutil.copy2(icon_path, os.path.join(build_dest, "icon.ico"))
+
+
+
+        # Asegurar carpetas y archivos .gitignore requeridos
+        required_dirs = [
+            os.path.join(build_dest, "bin", "apache"),
+            os.path.join(build_dest, "bin", "mariadb"),
+            os.path.join(build_dest, "bin", "php"),
+            os.path.join(build_dest, "bin", "phpmyadmin"),
+            os.path.join(build_dest, "data"),
+            os.path.join(build_dest, "tmp"),
+            os.path.join(build_dest, "app", "phpmyadmin")
+        ]
+        for req_dir in required_dirs:
+            os.makedirs(req_dir, exist_ok=True)
+            gi_file = os.path.join(req_dir, ".gitignore")
+            if not os.path.exists(gi_file):
+                with open(gi_file, "w", encoding="utf-8") as f:
+                    f.write("*\n!.gitignore\n")
+
+        print("Construccion completada con exito en la carpeta _build!")
+    except Exception as e:
+        print(f"Error al estructurar la carpeta {build_dest}: {e}")
         sys.exit(1)
 
 if __name__ == "__main__":

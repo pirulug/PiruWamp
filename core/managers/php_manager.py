@@ -69,8 +69,14 @@ opcache.fast_shutdown=1
             with open(php_ini_path, "w", encoding="utf-8") as f:
                 f.write(content)
             logger.log("php.ini actualizado (extension_dir, OPcache y rendimiento)", "PHP")
+
+            # 4. Asegurar extensiones requeridas por phpMyAdmin y entorno moderno (sodium, mysqli, etc.)
+            from .setup_manager import SetupManager
+            active_exts = config.php_extensions or SetupManager.DEFAULT_EXTENSIONS
+            PHPManager.sync_extensions(active_exts)
         except Exception as e:
             logger.log(f"Error actualizando php.ini: {e}", "PHP")
+
 
 
     @staticmethod
@@ -261,27 +267,40 @@ opcache.fast_shutdown=1
             
             new_lines = []
             changed = False
+            found_exts = set()
             for line in lines:
+
                 stripped = line.strip()
-                # Buscar patrón de extensión: [;]extension=nombre [; comentario]
                 match = re.match(r'^(;)?extension\s*=\s*([^; \t\n\r]+)', stripped)
                 if match:
                     is_commented = match.group(1) is not None
-                    ext_name = match.group(2)
+                    ext_name = match.group(2).replace("php_", "").replace(".dll", "")
+                    raw_name = match.group(2)
                     
-                    if ext_name in enabled_extensions and is_commented:
-                        # Reemplazar solo la parte del ;extension= por extension=
+                    if (ext_name in enabled_extensions or raw_name in enabled_extensions) and is_commented:
                         new_line = re.sub(r'^;extension', 'extension', line)
                         new_lines.append(new_line)
+                        found_exts.add(ext_name)
+                        found_exts.add(raw_name)
                         changed = True
                     else:
+                        if not is_commented:
+                            found_exts.add(ext_name)
+                            found_exts.add(raw_name)
                         new_lines.append(line)
                 else:
                     new_lines.append(line)
-            
+
+            # Si alguna extension requerida no estaba en el archivo php.ini, agregarla al final
+            for ext in enabled_extensions:
+                if ext not in found_exts and f"php_{ext}.dll" not in found_exts:
+                    new_lines.append(f"extension={ext}\n")
+                    changed = True
+
             if changed:
                 with open(php_ini_path, "w", encoding="utf-8") as f:
                     f.writelines(new_lines)
-                logger.log(f"Sincronizadas {len(enabled_extensions)} extensiones", "PHP")
+                logger.log(f"Sincronizadas {len(enabled_extensions)} extensiones (incluyendo sodium y mysqli)", "PHP")
         except Exception as e:
             logger.log(f"Error sincronizando extensiones: {e}", "PHP")
+

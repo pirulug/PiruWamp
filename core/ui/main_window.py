@@ -33,9 +33,15 @@ class MainWindow:
         apply_window_style(self.root)
         
         # Intentar cargar icono si existe
-        icon_path = os.path.join(config.wamp_root, "icon.ico")
+        icon_path = os.path.join(config.wamp_root, "core", "img", "icon.ico")
+        if not os.path.exists(icon_path):
+            icon_path = os.path.join(config.wamp_root, "icon.ico")
         if os.path.exists(icon_path):
-            self.root.iconbitmap(icon_path)
+            try:
+                self.root.iconbitmap(icon_path)
+            except Exception:
+                pass
+
 
         self.apache = ApacheService()
         self.mariadb = MariaDBService()

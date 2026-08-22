@@ -2,6 +2,7 @@
 build/
 dist/
 .build/
+_build/
 .compile/
 __pycache__/
 *.py[cod]
