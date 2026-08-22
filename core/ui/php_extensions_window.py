@@ -140,7 +140,7 @@ class PHPExtensionsWindow(tk.Toplevel):
         
         def run():
             def update_progress(percent):
-                self.progress_bar['value'] = percent
+                self.progress_bar["value"] = percent
                 self.update_idletasks()
 
             success = PHPManager.install_imagick(update_progress)
@@ -151,11 +151,12 @@ class PHPExtensionsWindow(tk.Toplevel):
                 if success:
                     messagebox.showinfo("Éxito", "Imagick se ha instalado y activado correctamente.\nReinicia Apache para aplicar los cambios.")
                     self.load_extensions()
-                    if hasattr(self.parent_app, 'update_php_extensions_menu'):
+                    if hasattr(self.parent_app, "update_php_extensions_menu"):
                         self.parent_app.update_php_extensions_menu()
                 else:
                     messagebox.showerror("Error", "No se pudo instalar Imagick. Revisa los logs para más detalles.")
 
             self.after(0, finish)
+
 
         threading.Thread(target=run, daemon=True).start()

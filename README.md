@@ -1,62 +1,79 @@
 # PiruWamp
 
-PiruWamp es un entorno de desarrollo web local (WAMP: Windows, Apache, MariaDB, PHP) modular, con soporte multi-versión y una interfaz gráfica construida en Python (Tkinter). Está diseñado para ser ligero, automatizado y fácil de compilar y distribuir.
+PiruWamp is a modular, portable, and multi-version local web development environment (WAMP: Windows, Apache, MariaDB, PHP) with a native graphical user interface built in Python (Tkinter). It is designed to be lightweight, highly customizable, automated, and easy to build and distribute on Windows.
 
-## Características Principales
+> **Note:** For the Spanish version of this documentation, see [README.es.md](README.es.md).
 
-- **Gestión Multi-Versión:** Descarga, instala y cambia en tiempo real entre múltiples versiones de Apache, PHP, MariaDB y phpMyAdmin directamente desde la interfaz.
-- **Auto-Configuración:** Sincronización automática de extensiones de PHP, inicialización de MariaDB sin contraseña (vía `mysql_install_db.exe`) y configuración de auto-login para phpMyAdmin.
-- **Arquitectura Modular:** El motor Python está desacoplado de los binarios, usando un sistema de repositorios y servicios dinámicos.
-- **Auto-Elevación:** Se solicita automáticamente permisos de Administrador para gestionar servicios de Windows y el archivo `hosts` si es necesario.
+## Key Features
 
-## Estructura del Proyecto
+- **Multi-Version Management:** Download, install, and switch in real time between multiple versions of Apache, PHP, MariaDB, and phpMyAdmin directly from the graphical interface.
+- **Full Portability:** Dynamic root path detection and automatic synchronization of absolute paths (`httpd.conf`, `mod_php.conf`, `my.ini`, `php.ini`, aliases, and virtual hosts) on every startup or drive letter change.
+- **Locations Tab & Custom DocumentRoot:** Customize the web projects folder `www` to any directory on your computer using a visual folder picker, or restore the default path with a single click.
+- **Full Imagick Support:** Intelligent extension installer with multi-version PECL fallback (3.8.1 / 3.8.0 / 3.7.0) compatible with PHP 7.4, 8.0, 8.1, 8.2, 8.3, 8.4, and 8.5+, automatically copying required dependency DLLs (`CORE_RL_*.dll` and `IM_MOD_RL_*.dll`).
+- **phpMyAdmin Directly in `bin/`:** phpMyAdmin is downloaded, auto-configured with auto-login (`127.0.0.1:3306`, user `root`), and executed directly from `bin/phpmyadmin/` without redundant copies.
+- **Automatic Virtual Hosts:** Automatically creates `.test` local domains and registers them in the Windows `hosts` file for every project subfolder located in `www/`.
+- **Automatic Privilege Elevation:** Prompts for Administrator permissions via Windows UAC when service control or `hosts` file modification is required.
 
-El proyecto está diseñado de forma autocontenida usando rutas relativas:
+## Project Structure
 
-- `bin/` - Contiene las versiones descargadas de los binarios (Apache, MariaDB, PHP, phpMyAdmin).
-- `core/` - Código fuente en Python organizado en capas (`core`, `managers`, `services`, `ui`, `img`).
-- `data/` - Archivos de bases de datos de MariaDB/MySQL.
-- `etc/` - Archivos de configuración (Ej. `config.conf`, alias de Apache, repositorios de descargas).
-- `tmp/` - Archivos temporales generados en tiempo de ejecución.
-- `www/` - Directorio raíz para los proyectos web locales.
-- `piruwamp.py` - Punto de entrada principal para el desarrollo en código fuente.
+The project is designed in a self-contained manner using relative paths:
 
-## Cómo Compilar el Proyecto en un `.exe`
+- `bin/` - Stores installed binary versions:
+  - `bin/apache/` - Apache HTTP servers.
+  - `bin/mariadb/` - MariaDB database servers.
+  - `bin/php/` - PHP runtime environments.
+  - `bin/phpmyadmin/` - phpMyAdmin instances.
+- `core/` - Python source code structured in layers (`core`, `managers`, `services`, `ui`, `img`).
+- `data/` - Persistent database files for MariaDB/MySQL.
+- `etc/` - Configuration files:
+  - `etc/config.conf` - General PiruWamp configuration.
+  - `etc/apache.conf`, `etc/php.conf`, `etc/mariadb.conf`, `etc/phpmyadmin.conf` - Catalogs of official downloadable versions.
+  - `etc/apache2/` - Apache configuration, aliases, and `sites-enabled`.
+  - `etc/mariadb/` - MariaDB `my.ini` configuration.
+- `tmp/` - Temporary files generated at runtime.
+- `www/` - Root directory for local web projects with a clean `index.php` welcome page that verifies server and Imagick status.
+- `piruwamp.py` - Main entry point for local development and direct execution.
+- `build.py` - Automated build and packaging script.
+- `clean.py` - Script to clean Python temporary compilation files.
 
-Para empaquetar todo el código Python en un solo ejecutable que no dependa de tener Python instalado en el equipo destino, usamos **PyInstaller** o el script automatizado:
+## Building the Executable (`.exe`)
+
+To compile the project into a standalone executable that does not require Python on the target machine, PyInstaller is used via the automated build script:
+
 ```bash
 python build.py
 ```
 
-### Prerrequisitos
-Asegúrate de tener Python instalado y ejecutar el siguiente comando para instalar PyInstaller:
+### Prerequisites
+Make sure you have Python 3.10+ installed along with `pyinstaller`:
 ```bash
 pip install pyinstaller
 ```
 
-### Pasos para compilar manualmente
-1. Abre una terminal en la raíz de tu proyecto.
-2. Ejecuta el script de compilación:
+### Build Process
+1. Open a terminal in the project root directory.
+2. Run:
    ```bash
    python build.py
    ```
-3. Al finalizar, el archivo `piruwamp.exe` se generará en la raíz del proyecto y los archivos de distribución en `.build/`.
+3. The script will compile `piruwamp.exe` with its embedded privileges manifest and icon, and structure a clean, portable distribution in the `_build/` folder.
 
-## Cómo Crear el Instalador (Setup)
+## Creating the Installer (Setup) with Inno Setup
 
-Para distribuir PiruWamp, el proyecto incluye un script de Inno Setup que empaqueta el `.exe` junto a todos los binarios y carpetas necesarias.
+To generate the distributable Windows installer for PiruWamp:
 
-1. Descarga e instala [Inno Setup](https://jrsoftware.org/isinfo.php).
-2. Asegúrate de haber completado la compilación del `.exe` (paso anterior) y tener el archivo `piruwamp.exe` en la raíz.
-3. Abre el archivo `piruwamp.iss` (ubicado en la raíz del proyecto) usando Inno Setup Compiler.
-4. Presiona el botón de **Compile** o **Run**.
-5. Al finalizar, el instalador comprimido `piruwamp-setup.exe` se generará en la carpeta raíz, listo para ser instalado en cualquier PC con Windows.
+1. Download and install [Inno Setup](https://jrsoftware.org/isinfo.php).
+2. Compile the executable first by running `python build.py`.
+3. Open `piruwamp.iss` using Inno Setup Compiler.
+4. Click **Compile** (or press `Ctrl + F9`).
+5. The compressed installer `piruwamp-setup.exe` will be generated in the project root folder, ready for deployment on any Windows machine.
 
-## Desarrollo Local
+## Local Development
 
-Si deseas hacer pruebas o modificar el código sin compilar, puedes iniciar el proyecto ejecutando el archivo fuente:
+To run and test PiruWamp directly from the source code without compiling:
 
 ```bash
 python piruwamp.py
 ```
-> Si no ejecutas la consola como administrador, el sistema pedirá elevación de permisos automáticamente mediante UAC de Windows.
+
+> Note: If the console is not run as Administrator, PiruWamp will automatically request elevated permissions via Windows UAC.

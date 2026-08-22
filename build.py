@@ -140,7 +140,21 @@ def main():
                 with open(gi_file, "w", encoding="utf-8") as f:
                     f.write("*\n!.gitignore\n")
 
+        # Limpiar rutas absolutas fijas en _build/etc/config.conf para portabilidad
+        build_cfg = os.path.join(build_dest, "etc", "config.conf")
+        if os.path.exists(build_cfg):
+            try:
+                with open(build_cfg, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                new_lines = [l for l in lines if not l.strip().startswith("wamp_root") and not l.strip().startswith("www_path")]
+                with open(build_cfg, "w", encoding="utf-8") as f:
+                    f.writelines(new_lines)
+            except Exception:
+                pass
+
+
         print("Construccion completada con exito en la carpeta _build!")
+
     except Exception as e:
         print(f"Error al estructurar la carpeta {build_dest}: {e}")
         sys.exit(1)

@@ -171,88 +171,106 @@ opcache.fast_shutdown=1
 
     @staticmethod
     def install_imagick(progress_callback=None):
+
         import urllib.request
+        import urllib.error
         import zipfile
         import tempfile
         import shutil
+        import re
+        import ssl
 
         php_version = config.active_php_version
         if not php_version:
             logger.log("No hay versión de PHP activa para instalar Imagick", "PHP")
             return False
 
-        # Extraer versión mayor.menor (ej: 8.2 de php-8.2.28)
-        import re
-        match = re.search(r'php-(\d+\.\d+)', php_version)
+        # Extraer version mayor.menor (ej: 8.5 de php-8.5.9)
+        match = re.search(r"php-(\d+\.\d+)", php_version)
         if not match:
             logger.log(f"No se pudo determinar la versión de PHP desde '{php_version}'", "PHP")
             return False
         
         ver = match.group(1)
         
-        # Mapeo de compiladores (basado en lo observado en php.conf)
-        # php 7.3, 7.4 -> vc15
-        # php 8.0, 8.1, 8.2, 8.3 -> vs16
-        # php 8.4, 8.5 -> vs17
+        # Mapeo de compiladores
         compiler = "vs16"
-        if ver.startswith("7."): compiler = "vc15"
-        elif ver >= "8.4": compiler = "vs17"
+        if ver.startswith("7."):
+            compiler = "vc15"
+        elif ver >= "8.4":
+            compiler = "vs17"
 
-        # URL Pattern: https://windows.php.net/downloads/pecl/releases/imagick/3.7.0/php_imagick-3.7.0-8.2-ts-vs16-x64.zip
-        imagick_ver = "3.7.0"
-        url = f"https://windows.php.net/downloads/pecl/releases/imagick/{imagick_ver}/php_imagick-{imagick_ver}-{ver}-ts-{compiler}-x64.zip"
+        # Versiones candidatas de Imagick en PECL ordenadas de mas reciente a anterior
+        candidate_versions = ["3.8.1", "3.8.0", "3.7.0"]
         
-        logger.log(f"Descargando Imagick para PHP {ver} ({compiler})...", "PHP")
+        context = ssl._create_unverified_context()
+        headers = {"User-Agent": "Mozilla/5.0"}
         
-        try:
-            import ssl
-            context = ssl._create_unverified_context()
+        for imagick_ver in candidate_versions:
+            url = f"https://windows.php.net/downloads/pecl/releases/imagick/{imagick_ver}/php_imagick-{imagick_ver}-{ver}-ts-{compiler}-x64.zip"
+            logger.log(f"Descargando Imagick {imagick_ver} para PHP {ver} ({compiler})...", "PHP")
             
-            headers = {'User-Agent': 'Mozilla/5.0'}
-            with tempfile.TemporaryDirectory() as tmpdir:
-                zip_path = os.path.join(tmpdir, "imagick.zip")
-                
-                req = urllib.request.Request(url, headers=headers)
-                with urllib.request.urlopen(req, context=context) as response:
-                    total_size = int(response.headers.get('content-length', 0))
-                    downloaded = 0
-                    with open(zip_path, 'wb') as out_file:
-                        while True:
-                            chunk = response.read(8192)
-                            if not chunk: break
-                            out_file.write(chunk)
-                            downloaded += len(chunk)
-                            if progress_callback and total_size > 0:
-                                progress_callback(int(downloaded * 100 / total_size))
+            try:
+                with tempfile.TemporaryDirectory() as tmpdir:
+                    zip_path = os.path.join(tmpdir, "imagick.zip")
+                    
+                    req = urllib.request.Request(url, headers=headers)
+                    with urllib.request.urlopen(req, context=context) as response:
+                        total_size = int(response.headers.get("content-length", 0))
+                        downloaded = 0
+                        with open(zip_path, "wb") as out_file:
+                            while True:
+                                chunk = response.read(8192)
+                                if not chunk:
+                                    break
+                                out_file.write(chunk)
+                                downloaded += len(chunk)
+                                if progress_callback and total_size > 0:
+                                    progress_callback(int(downloaded * 100 / total_size))
 
-                logger.log("Extrayendo Imagick...", "PHP")
-                extract_path = os.path.join(tmpdir, "extracted")
-                os.makedirs(extract_path, exist_ok=True)
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    zip_ref.extractall(extract_path)
+                    logger.log(f"Extrayendo Imagick {imagick_ver}...", "PHP")
+                    extract_path = os.path.join(tmpdir, "extracted")
+                    os.makedirs(extract_path, exist_ok=True)
+                    with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                        zip_ref.extractall(extract_path)
 
-                # 1. Mover php_imagick.dll a ext/
-                ext_dir = os.path.join(config.php_path, "ext")
-                os.makedirs(ext_dir, exist_ok=True)
-                dll_src = os.path.join(extract_path, "php_imagick.dll")
-                if os.path.exists(dll_src):
-                    shutil.copy2(dll_src, os.path.join(ext_dir, "php_imagick.dll"))
-                
-                # 2. Mover CORE_RL_*.dll a la raíz de PHP
-                for file in os.listdir(extract_path):
-                    if file.startswith("CORE_RL_") and file.endswith(".dll"):
-                        shutil.copy2(os.path.join(extract_path, file), os.path.join(config.php_path, file))
-                
-                # 3. Habilitar en php.ini
-                PHPManager.add_extension("imagick")
-                PHPManager.toggle_extension("imagick") # Asegurar que esté activo (sin ;)
-                
-                logger.log("Imagick instalado y habilitado correctamente", "PHP")
-                return True
+                    # 1. Mover php_imagick.dll a ext/
+                    ext_dir = os.path.join(config.php_path, "ext")
+                    os.makedirs(ext_dir, exist_ok=True)
+                    dll_src = os.path.join(extract_path, "php_imagick.dll")
+                    if os.path.exists(dll_src):
+                        shutil.copy2(dll_src, os.path.join(ext_dir, "php_imagick.dll"))
+                    
+                    # 2. Mover CORE_RL_*.dll e IM_MOD_RL_*.dll a la raíz de PHP y de Apache bin
+                    apache_bin_dir = os.path.join(config.apache_path, "bin") if config.apache_path else ""
+                    for file in os.listdir(extract_path):
+                        if (file.startswith("CORE_RL_") or file.startswith("IM_MOD_RL_")) and file.endswith(".dll"):
+                            shutil.copy2(os.path.join(extract_path, file), os.path.join(config.php_path, file))
+                            if apache_bin_dir and os.path.exists(apache_bin_dir):
+                                try:
+                                    shutil.copy2(os.path.join(extract_path, file), os.path.join(apache_bin_dir, file))
+                                except Exception:
+                                    pass
+                    
+                    # 3. Habilitar en php.ini
+                    PHPManager.add_extension("imagick")
+                    PHPManager.toggle_extension("imagick")
+                    
+                    logger.log(f"Imagick {imagick_ver} instalado y habilitado correctamente en PHP {ver}", "PHP")
+                    return True
 
-        except Exception as e:
-            logger.log(f"Error instalando Imagick: {e}", "PHP")
-            return False
+            except urllib.error.HTTPError as he:
+                if he.code == 404:
+                    logger.log(f"Versión de Imagick {imagick_ver} no disponible para PHP {ver} (404), probando candidata...", "PHP")
+                    continue
+                else:
+                    logger.log(f"Error HTTP descargando Imagick {imagick_ver}: {he}", "PHP")
+            except Exception as e:
+                logger.log(f"Error instalando Imagick {imagick_ver}: {e}", "PHP")
+
+        logger.log(f"No se encontró un paquete compatible de Imagick en PECL para PHP {ver}", "PHP")
+        return False
+
     @staticmethod
     def sync_extensions(enabled_extensions):
         """Habilita en la versión actual las extensiones que estaban habilitadas en la anterior."""

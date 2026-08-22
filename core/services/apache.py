@@ -39,20 +39,21 @@ class ApacheService(BaseService):
                 content = f.read()
 
             # 1. Actualizar SRVROOT
-            content = re.sub(r'^Define SRVROOT ".*"', f'Define SRVROOT "{apache_path}"', content, flags=re.M)
+            content = re.sub(r'^\s*Define\s+SRVROOT\s+.*$', f'Define SRVROOT "{apache_path}"', content, flags=re.M)
             
             # 2. Actualizar DocumentRoot y su Directory (solo el principal)
-            content = re.sub(r'^DocumentRoot ".*"', f'DocumentRoot "{www_path}"', content, flags=re.M)
+            content = re.sub(r'^\s*DocumentRoot\s+.*$', f'DocumentRoot "{www_path}"', content, flags=re.M)
             
             def fix_directory(match):
                 path = match.group(1).lower()
-                if "htdocs" in path or "www" in path or "${srvroot}" in path:
-                    if path.strip() == "/" or path.strip() == "${srvroot}":
+                if "htdocs" in path or "www" in path or "${srvroot}" in path or ":/" in path or ":\\" in path:
+                    if path.strip() == "/" or path.strip() == "${srvroot}" or path.strip() == "${srvroot}/" or "cgi-bin" in path:
                         return match.group(0)
                     return f'<Directory "{www_path}">'
                 return match.group(0)
 
-            content = re.sub(r'<Directory "([^"]*)">', fix_directory, content)
+            content = re.sub(r'^\s*<Directory\s+"?([^">\n]+)"?>', fix_directory, content, flags=re.M)
+
 
             # 3. DirectoryIndex
             if "DirectoryIndex index.php" not in content:
