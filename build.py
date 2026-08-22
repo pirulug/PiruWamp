@@ -83,13 +83,12 @@ def main():
                 "*.py", "*.pyc", "__pycache__", ".git", ".gitignore", 
                 "build.py", "clean.py", "wamp.spec", "main.spec", "piruwamp.spec",
                 ".compile", ".build", "_build", "build", "dist",
-                "*.iss", "wamp.exe", "main.exe", "piruwamp", "core",
+                "*.iss", "wamp.exe", "main.exe", "piruwamp", "core", "app",
                 "crash.log", "*.log", "_doc", ".agents", "scratch"
             ]
             for pattern in patterns:
                 ignored.update(fnmatch.filter(names, pattern))
 
-            
             abs_src = os.path.abspath(".")
             abs_path = os.path.abspath(path)
             rel_path = os.path.relpath(abs_path, abs_src)
@@ -102,14 +101,6 @@ def main():
                     if os.path.isdir(full_name_path):
                         ignored.add(name)
 
-            # En app/, ignorar phpmyadmin desplegado en runtime
-            if len(parts) == 2 and parts[0] == "app" and parts[1] == "phpmyadmin":
-                for name in names:
-                    if name != ".gitignore":
-                        ignored.add(name)
-            elif len(parts) == 1 and parts[0] == "app":
-                if "phpmyadmin" in names:
-                    ignored.add("phpmyadmin")
 
             # En data/, no empaquetar bases de datos locales
             if parts[0] == "data":
@@ -139,8 +130,9 @@ def main():
             os.path.join(build_dest, "bin", "phpmyadmin"),
             os.path.join(build_dest, "data"),
             os.path.join(build_dest, "tmp"),
-            os.path.join(build_dest, "app", "phpmyadmin")
+            os.path.join(build_dest, "www")
         ]
+
         for req_dir in required_dirs:
             os.makedirs(req_dir, exist_ok=True)
             gi_file = os.path.join(req_dir, ".gitignore")

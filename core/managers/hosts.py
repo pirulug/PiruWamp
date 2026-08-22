@@ -5,38 +5,9 @@ from ..core.logger import logger
 class HostsManager:
     @staticmethod
     def ensure_dashboard_hosts():
-        """Asegura que piruwam.localhost y piruwamp.localhost esten en el archivo hosts"""
-        hosts_path = config.hosts_file
-        if not os.path.exists(hosts_path):
-            return
+        """No-op ya que el dashboard en app/web fue retirado"""
+        pass
 
-        entry = "127.0.0.1    piruwam.localhost piruwamp.localhost"
-        try:
-            with open(hosts_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
-
-            start, end = None, None
-            for i, line in enumerate(lines):
-                if line.strip() == "# Start PiruWamp":
-                    start = i
-                if line.strip() == "# End PiruWamp":
-                    end = i
-
-            if start is None or end is None:
-                lines.append("\n# Start PiruWamp\n")
-                lines.append(entry + "\n")
-                lines.append("# End PiruWamp\n")
-            else:
-                block = lines[start+1:end]
-                if not any("piruwam.localhost" in l for l in block):
-                    block.insert(0, entry + "\n")
-                    lines = lines[:start+1] + block + lines[end:]
-
-            with open(hosts_path, "w", encoding="utf-8") as f:
-                f.writelines(lines)
-            logger.log("Asegurado piruwam.localhost en hosts", "Hosts")
-        except Exception as e:
-            logger.log(f"Error registrando piruwam.localhost en hosts: {e}", "Hosts")
 
     @staticmethod
     def add_to_hosts(project_name):

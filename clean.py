@@ -28,8 +28,9 @@ def clean_project():
     # 2. Recorrer todo el directorio del proyecto para __pycache__ y archivos .pyc
     for root, dirs, files in os.walk(".", topdown=False):
         # Excluir control de versiones, entornos virtuales y carpetas de build/bin
-        if ".git" in root or "venv" in root or ".venv" in root or "_build" in root or "bin" in root or "app" in root:
+        if ".git" in root or "venv" in root or ".venv" in root or "_build" in root or "bin" in root:
             continue
+
 
         # Eliminar carpetas __pycache__
         for d in dirs:

@@ -184,7 +184,6 @@ PHPIniDir "{formatted_php}"
         os.makedirs(sites_dir, exist_ok=True)
 
         pma_path = config.phpmyadmin_path.replace("\\", "/").rstrip("/")
-        web_path = os.path.join(config.wamp_root, "app", "web").replace("\\", "/").rstrip("/")
         www_dir = config.www_path.replace("\\", "/").rstrip("/")
 
         # 1. Generar dinamicamente alias phpmyadmin.conf
@@ -202,23 +201,15 @@ PHPIniDir "{formatted_php}"
         except Exception as e:
             logger.log(f"Error escribiendo {pma_conf}: {e}", self.name)
 
-        # 2. Generar dinamicamente alias piruwamp.localhost.conf
-        piru_conf = os.path.join(alias_dir, "piruwamp.localhost.conf")
-        piru_content = f"""Alias /piruwamp "{web_path}/"
-Alias /piruwam "{web_path}/"
-<Directory "{web_path}/">
-    Options Indexes FollowSymLinks MultiViews
-    AllowOverride All
-    Require all granted
-</Directory>
-"""
-        try:
-            with open(piru_conf, "w", encoding="utf-8") as f:
-                f.write(piru_content)
-        except Exception as e:
-            logger.log(f"Error escribiendo {piru_conf}: {e}", self.name)
+        # Limpiar alias piruwamp.localhost.conf si existe
+        old_piru_conf = os.path.join(alias_dir, "piruwamp.localhost.conf")
+        if os.path.exists(old_piru_conf):
+            try:
+                os.remove(old_piru_conf)
+            except Exception:
+                pass
 
-        # 3. Sincronizar sites-enabled dinamicamente con la ruta actual
+        # 2. Sincronizar sites-enabled dinamicamente con la ruta actual
         try:
             from ..managers.vhost import VHostManager
             from ..managers.hosts import HostsManager
@@ -226,16 +217,15 @@ Alias /piruwam "{web_path}/"
         except Exception as e:
             logger.log(f"Error sincronizando sites-enabled: {e}", self.name)
 
-        # 4. Para cualquier otro archivo .conf adicional en alias/ o sites-enabled/
+        # 3. Para cualquier otro archivo .conf adicional en alias/ o sites-enabled/
         def normalize_other_paths(content: str) -> str:
             content = re.sub(r'[A-Za-z]:[\\/][^"\r\n]*[\\/]www[\\/]*', www_dir + "/", content, flags=re.IGNORECASE)
-            content = re.sub(r'[A-Za-z]:[\\/][^"\r\n]*[\\/]app[\\/]web[\\/]*', web_path + "/", content, flags=re.IGNORECASE)
-            content = re.sub(r'[A-Za-z]:[\\/][^"\r\n]*[\\/]app[\\/]phpmyadmin[\\/]*', pma_path + "/", content, flags=re.IGNORECASE)
+            content = re.sub(r'[A-Za-z]:[\\/][^"\r\n]*[\\/]bin[\\/]phpmyadmin[\\/]*', pma_path + "/", content, flags=re.IGNORECASE)
             return content
 
         for pattern in [os.path.join(alias_dir, "*.conf"), os.path.join(sites_dir, "*.conf")]:
             for file in glob.glob(pattern):
-                if os.path.basename(file) in ["phpmyadmin.conf", "piruwamp.localhost.conf", "00-default.conf", "00-piruwam.localhost.conf"]:
+                if os.path.basename(file) in ["phpmyadmin.conf", "00-default.conf"]:
                     continue
                 try:
                     with open(file, "r", encoding="utf-8") as f:
@@ -247,5 +237,6 @@ Alias /piruwam "{web_path}/"
                         logger.log(f"Configuracion actualizada: {os.path.basename(file)}", self.name)
                 except Exception as e:
                     logger.log(f"Error actualizando {file}: {e}", self.name)
+
 
 

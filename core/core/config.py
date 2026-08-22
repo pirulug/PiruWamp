@@ -247,12 +247,6 @@ class Config:
         return self.data.get("phpmyadmin_version", None)
 
     @property
-    def app_phpmyadmin_path(self):
-        path = os.path.join(self.wamp_root, "app", "phpmyadmin")
-        os.makedirs(path, exist_ok=True)
-        return path
-
-    @property
     def bin_phpmyadmin_path(self):
         path = os.path.join(self.wamp_root, "bin", "phpmyadmin")
         os.makedirs(path, exist_ok=True)
@@ -260,17 +254,22 @@ class Config:
 
     @property
     def phpmyadmin_path(self):
-        # La instancia activa en ejecucion siempre reside en app/phpmyadmin
-        app_path = self.app_phpmyadmin_path
-        if not os.path.exists(os.path.join(app_path, "index.php")):
-            version = self.active_phpmyadmin_version
-            if version:
-                self.deploy_phpmyadmin_to_app(version)
-            elif os.path.exists(self.bin_phpmyadmin_path):
-                installed = [v for v in os.listdir(self.bin_phpmyadmin_path) if os.path.isdir(os.path.join(self.bin_phpmyadmin_path, v))]
-                if installed:
-                    self.set_phpmyadmin_version(installed[0])
-        return app_path
+        version = self.active_phpmyadmin_version
+        if version:
+            path = self.get_bin_phpmyadmin_version_path(version)
+            if path and os.path.exists(path):
+                self._configure_pma_autologin(path)
+                return path
+        
+        # Fallback a la primera version en bin/phpmyadmin
+        if os.path.exists(self.bin_phpmyadmin_path):
+            installed = [v for v in os.listdir(self.bin_phpmyadmin_path) if os.path.isdir(os.path.join(self.bin_phpmyadmin_path, v))]
+            for v in installed:
+                path = self.get_bin_phpmyadmin_version_path(v)
+                if path and os.path.exists(path):
+                    self._configure_pma_autologin(path)
+                    return path
+        return os.path.join(self.bin_phpmyadmin_path, "default")
 
     def get_bin_phpmyadmin_version_path(self, version):
         """Devuelve la ruta dentro de bin/phpmyadmin que contiene los archivos de esa version."""
@@ -313,7 +312,6 @@ class Config:
                     content = f.read()
                 
                 content = re.sub(r"\['blowfish_secret'\]\s*=\s*''", "['blowfish_secret'] = 'piruwamp_secret_key_32_bytes_long_12345'", content)
-
                 content = re.sub(r"\['host'\]\s*=\s*'localhost'", "['host'] = '127.0.0.1'", content)
                 content = re.sub(r"\['auth_type'\]\s*=\s*'cookie'", "['auth_type'] = 'config'", content)
                 if "['port']" not in content:
@@ -322,54 +320,30 @@ class Config:
                     content = re.sub(r"(\['auth_type'\]\s*=\s*'config';)", r"\1\n$cfg['Servers'][$i]['user'] = 'root';\n$cfg['Servers'][$i]['password'] = '';", content)
                 content = re.sub(r"\['AllowNoPassword'\]\s*=\s*false", "['AllowNoPassword'] = true", content)
                 
+                # Desactivar chequeos externos para evitar lentitud
+                if "['VersionCheck']" not in content:
+                    content += "\n$cfg['VersionCheck'] = false;\n$cfg['SendErrorReports'] = 'never';\n"
+
                 with open(config_file, "w", encoding="utf-8") as f:
                     f.write(content)
             except Exception as e:
                 print(f"Error configurando auto-login en {config_file}: {e}")
 
-
-    def deploy_phpmyadmin_to_app(self, version):
-        """Copia la version original desde bin/phpmyadmin a app/phpmyadmin."""
-        import shutil
-        src_path = self.get_bin_phpmyadmin_version_path(version)
-        if not src_path or not os.path.exists(src_path):
-            return False
-
-        target_path = self.app_phpmyadmin_path
-        try:
-            os.makedirs(target_path, exist_ok=True)
-            for item in os.listdir(target_path):
-                item_path = os.path.join(target_path, item)
-                if os.path.isdir(item_path):
-                    shutil.rmtree(item_path)
-                else:
-                    os.remove(item_path)
-
-            for item in os.listdir(src_path):
-                s = os.path.join(src_path, item)
-                d = os.path.join(target_path, item)
-                if os.path.isdir(s):
-                    shutil.copytree(s, d)
-                else:
-                    shutil.copy2(s, d)
-
-            self._configure_pma_autologin(target_path)
-            return True
-        except Exception as e:
-            print(f"Error desplegando phpMyAdmin a {target_path}: {e}")
-            return False
-
     def set_phpmyadmin_version(self, version):
         self.data["phpmyadmin_version"] = version
         self.save_config()
         if version:
-            self.deploy_phpmyadmin_to_app(version)
+            path = self.get_bin_phpmyadmin_version_path(version)
+            if path:
+                self._configure_pma_autologin(path)
         try:
             from ..services.apache import ApacheService
             apache_svc = ApacheService()
             apache_svc._update_extra_confs()
         except Exception:
             pass
+
+
 
 
     @property
@@ -406,9 +380,6 @@ class Config:
             os.path.join(self.wamp_root, "bin", "mariadb"),
             os.path.join(self.wamp_root, "bin", "php"),
             os.path.join(self.wamp_root, "bin", "phpmyadmin"),
-            os.path.join(self.wamp_root, "app"),
-            os.path.join(self.wamp_root, "app", "phpmyadmin"),
-            os.path.join(self.wamp_root, "app", "web"),
             os.path.join(self.wamp_root, "etc"),
             os.path.join(self.wamp_root, "etc", "mariadb"),
             os.path.join(self.wamp_root, "etc", "apache2"),
@@ -416,10 +387,12 @@ class Config:
             os.path.join(self.wamp_root, "etc", "apache2", "sites-enabled"),
             os.path.join(self.wamp_root, "etc", "temp"),
             os.path.join(self.wamp_root, "data"),
+            os.path.join(self.wamp_root, "tmp"),
             os.path.join(self.wamp_root, "www"),
         ]
         for d in dirs:
             os.makedirs(d, exist_ok=True)
+
 
         # 2. Crear archivos por defecto si no existen
         files = {

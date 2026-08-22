@@ -27,7 +27,7 @@ class VHostManager:
 
     @classmethod
     def sync_sites(cls, hosts_manager):
-        """Sincroniza vhosts con las carpetas en www/ y mantiene el vhost del dashboard en app/web"""
+        """Sincroniza vhosts con las carpetas en www/"""
         sites_dir = cls.get_sites_enabled_dir()
         www_path = config.www_path
         
@@ -52,29 +52,14 @@ class VHostManager:
         except Exception as e:
             logger.log(f"Error actualizando 00-default.conf: {e}", "Sites")
 
-        # 2. Asegurar VirtualHost para piruwam.localhost apuntando a app/web actual
-        web_path = os.path.join(config.wamp_root, "app", "web").replace("\\", "/")
-        dashboard_conf = os.path.join(sites_dir, "00-piruwam.localhost.conf")
-        dashboard_vhost = f"""
-<VirtualHost *:80>
-    DocumentRoot "{web_path}"
-    ServerName piruwam.localhost
-    ServerAlias piruwamp.localhost piruwam.test piruwamp.test
-    <Directory "{web_path}/">
-        Options Indexes FollowSymLinks MultiViews
-        AllowOverride All
-        Require all granted
-    </Directory>
-</VirtualHost>
-""".strip()
-        try:
-            with open(dashboard_conf, "w", encoding="utf-8") as f:
-                f.write(dashboard_vhost)
-        except Exception as e:
-            logger.log(f"Error creando vhost para piruwam.localhost: {e}", "Sites")
+        # Limpiar 00-piruwam.localhost.conf residual si existe
+        old_dashboard_conf = os.path.join(sites_dir, "00-piruwam.localhost.conf")
+        if os.path.exists(old_dashboard_conf):
+            try:
+                os.remove(old_dashboard_conf)
+            except Exception:
+                pass
 
-        if hasattr(hosts_manager, "ensure_dashboard_hosts"):
-            hosts_manager.ensure_dashboard_hosts()
 
         if not os.path.exists(www_path):
             return

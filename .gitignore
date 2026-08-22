@@ -22,12 +22,10 @@ data/*
 !data/.gitignore
 
 # Proyectos del usuario
-# Ignorar todos los proyectos creados, excepto el index.php (el dashboard)
+# Ignorar todos los proyectos creados, excepto el index.php
 www/*
 !www/index.php
+!www/.gitignore
 
-# Aplicaciones desplegadas en ejecución
-app/phpmyadmin/
-
-
-__init__.py
+__init__.py
+

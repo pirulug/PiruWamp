@@ -105,10 +105,11 @@ class MainWindow:
         self.btn_mariadb.grid(row=2, column=0, padx=5, pady=5)
 
         btn_create = tk.Button(btn_frame, text="Crear Proyecto", command=self.gui_create_project, width=25)
-        btn_web = tk.Button(btn_frame, text="Abrir Web", command=lambda: webbrowser.open("http://localhost"), width=25)
+        btn_web = tk.Button(btn_frame, text="Abrir Web", command=self.open_web_browser, width=25)
         btn_www = tk.Button(btn_frame, text="Abrir carpeta www", command=self.open_www, width=25)
-        btn_pma = tk.Button(btn_frame, text="Abrir PhpMyAdmin", command=lambda: webbrowser.open("http://localhost/phpmyadmin"), width=25)
+        btn_pma = tk.Button(btn_frame, text="Abrir PhpMyAdmin", command=self.open_phpmyadmin_browser, width=25)
         btn_restart = tk.Button(btn_frame, text="Reiniciar Apache", command=self.restart_apache, width=25)
+
         
         style_button(btn_create)
         style_button(btn_web)
@@ -243,11 +244,33 @@ class MainWindow:
             self.btn_both.config(text="Iniciar Ambos")
             style_button(self.btn_both)
 
+    def open_web_browser(self):
+        if not self.apache.is_running():
+            if self.apache.start():
+                self.btn_apache.config(text="Detener Apache")
+                style_button(self.btn_apache)
+                self.update_both_button()
+        webbrowser.open("http://localhost")
+
+    def open_phpmyadmin_browser(self):
+        if not self.apache.is_running():
+            if self.apache.start():
+                self.btn_apache.config(text="Detener Apache")
+                style_button(self.btn_apache)
+                self.update_both_button()
+        if not self.mariadb.is_running():
+            if self.mariadb.start():
+                self.btn_mariadb.config(text="Detener MariaDB")
+                style_button(self.btn_mariadb)
+                self.update_both_button()
+        webbrowser.open("http://localhost/phpmyadmin")
+
     def open_www(self):
         if os.path.exists(config.www_path):
             os.startfile(config.www_path)
         else:
-            messagebox.showerror("Error", f"No se encontró la carpeta:\n{config.www_path}")
+            messagebox.showerror("Error", f"No se encontro la carpeta:\n{config.www_path}")
+
 
     def gui_create_project(self):
         name = simpledialog.askstring("Nuevo Proyecto", "Nombre del proyecto:")

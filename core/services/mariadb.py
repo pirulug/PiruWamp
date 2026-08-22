@@ -15,9 +15,13 @@ class MariaDBService(BaseService):
 
     def update_config(self):
         my_ini_path = os.path.join(config.wamp_root, "etc", "mariadb", "my.ini")
+        os.makedirs(os.path.dirname(my_ini_path), exist_ok=True)
         datadir = os.path.join(config.wamp_root, "data")
+        tmpdir = os.path.join(config.wamp_root, "tmp")
+        os.makedirs(datadir, exist_ok=True)
+        os.makedirs(tmpdir, exist_ok=True)
         
-        # 1. Asegurar que el datadir esté inicializado
+        # 1. Asegurar limpieza de tc.log residual de caidas anteriores
         tc_log = os.path.join(datadir, "tc.log")
         if os.path.exists(tc_log):
             try:
@@ -26,23 +30,20 @@ class MariaDBService(BaseService):
             except Exception:
                 pass
 
-        if not os.path.exists(datadir) or not os.listdir(datadir):
-
-            os.makedirs(datadir, exist_ok=True)
+        # 2. Inicializar base de datos si falta el directorio mysql/ del sistema
+        mysql_system_dir = os.path.join(datadir, "mysql")
+        if not os.path.exists(mysql_system_dir):
             logger.log("Inicializando base de datos...", self.name)
             try:
                 import subprocess
-                
                 install_db_exe = os.path.join(config.mariadb_path, "bin", "mysql_install_db.exe")
                 if os.path.exists(install_db_exe):
-                    # MariaDB Windows initialization
                     subprocess.run([
                         install_db_exe, 
                         f"--datadir={datadir.replace('\\', '/')}"
                     ], capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW)
                     logger.log("Base de datos inicializada (mysql_install_db)", self.name)
                 else:
-                    # MySQL fallback
                     subprocess.run([
                         self.exe_path, 
                         "--initialize-insecure", 
@@ -52,54 +53,42 @@ class MariaDBService(BaseService):
             except Exception as e:
                 logger.log(f"Error inicializando base de datos: {e}", self.name)
 
-        if not os.path.exists(my_ini_path):
-            return
-
+        # 3. Escribir my.ini completamente dinamico
         try:
-            with open(my_ini_path, "r", encoding="utf-8") as f:
-                lines = f.readlines()
+            formatted_base = config.mariadb_path.replace("\\", "/")
+            formatted_data = datadir.replace("\\", "/")
+            formatted_tmp = tmpdir.replace("\\", "/")
 
-            new_lines = []
-            for line in lines:
-                stripped = line.strip()
-                if stripped.lower().startswith("basedir="):
-                    new_base = config.mariadb_path.replace("\\", "/")
-                    new_lines.append(f"basedir={new_base}\n")
-                elif stripped.lower().startswith("datadir="):
-                    new_data = datadir.replace("\\", "/")
-                    new_lines.append(f"datadir={new_data}\n")
-                elif stripped.lower().startswith("tmpdir="):
-                    new_tmp = os.path.join(config.wamp_root, "tmp").replace("\\", "/")
-                    new_lines.append(f"tmpdir={new_tmp}\n")
-                else:
-                    new_lines.append(line)
+            my_ini_content = f"""[mysqld]
+# Puerto
+port=3306
 
-            content_str = "".join(new_lines)
-            if "skip-name-resolve" not in content_str:
-                perf_block = """
+# Carpeta base y de datos dinamicas
+basedir={formatted_base}
+datadir={formatted_data}
+tmpdir={formatted_tmp}
+
+# Optimizacion de Red y Conexiones
 skip-name-resolve
 bind-address=0.0.0.0
 max_connections=150
 table_open_cache=2000
+
+# Motor InnoDB para 12 nucleos y 16GB RAM
 innodb_buffer_pool_size=1G
-innodb_buffer_pool_instances=4
 innodb_log_file_size=128M
 innodb_log_buffer_size=32M
 innodb_flush_log_at_trx_commit=2
 innodb_read_io_threads=8
 innodb_write_io_threads=8
-innodb_thread_concurrency=0
 innodb_file_per_table=1
-query_cache_size=64M
-query_cache_type=1
-"""
-                content_str = content_str.replace("[mysqld]", f"[mysqld]\n{perf_block}")
-                with open(my_ini_path, "w", encoding="utf-8") as f:
-                    f.write(content_str)
-            else:
-                with open(my_ini_path, "w", encoding="utf-8") as f:
-                    f.writelines(new_lines)
-            logger.log("my.ini actualizado con optimizaciones de rendimiento", self.name)
 
+[client]
+port=3306
+"""
+            with open(my_ini_path, "w", encoding="utf-8") as f:
+                f.write(my_ini_content)
+            logger.log("my.ini actualizado con rutas dinamicas y optimizaciones", self.name)
         except Exception as e:
             logger.log(f"Error actualizando my.ini: {e}", self.name)
+

@@ -122,5 +122,6 @@ class PHPMYAdminManagerWindow(tk.Toplevel):
 
     def activate_version(self, name):
         config.set_phpmyadmin_version(name)
-        messagebox.showinfo("phpMyAdmin", f"Version {name} activada en app/phpmyadmin.\n(Reinicia Apache para aplicar)")
+        messagebox.showinfo("phpMyAdmin", f"Version {name} activada correctamente.\n(Reinicia Apache para aplicar)")
         self.refresh_list()
+
