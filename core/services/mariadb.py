@@ -18,7 +18,16 @@ class MariaDBService(BaseService):
         datadir = os.path.join(config.wamp_root, "data")
         
         # 1. Asegurar que el datadir esté inicializado
+        tc_log = os.path.join(datadir, "tc.log")
+        if os.path.exists(tc_log):
+            try:
+                os.remove(tc_log)
+                logger.log("Archivo tc.log residual eliminado para arranque limpio", self.name)
+            except Exception:
+                pass
+
         if not os.path.exists(datadir) or not os.listdir(datadir):
+
             os.makedirs(datadir, exist_ok=True)
             logger.log("Inicializando base de datos...", self.name)
             try:

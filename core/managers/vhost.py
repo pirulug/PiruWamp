@@ -31,13 +31,30 @@ class VHostManager:
         sites_dir = cls.get_sites_enabled_dir()
         www_path = config.www_path
         
-        # Eliminar vhost obsoleto de sites-enabled si existia
+        # Asegurar VirtualHost para piruwam.localhost apuntando a app/web
+        web_path = os.path.join(config.wamp_root, "app", "web").replace("\\", "/")
         dashboard_conf = os.path.join(sites_dir, "00-piruwam.localhost.conf")
-        if os.path.exists(dashboard_conf):
-            try:
-                os.remove(dashboard_conf)
-            except Exception:
-                pass
+        dashboard_vhost = f"""
+<VirtualHost *:80>
+    DocumentRoot "{web_path}"
+    ServerName piruwam.localhost
+    ServerAlias piruwamp.localhost piruwam.test piruwamp.test
+    <Directory "{web_path}/">
+        Options Indexes FollowSymLinks MultiViews
+        AllowOverride All
+        Require all granted
+    </Directory>
+</VirtualHost>
+""".strip()
+        try:
+            with open(dashboard_conf, "w", encoding="utf-8") as f:
+                f.write(dashboard_vhost)
+        except Exception as e:
+            logger.log(f"Error creando vhost para piruwam.localhost: {e}", "Sites")
+
+        if hasattr(hosts_manager, "ensure_dashboard_hosts"):
+            hosts_manager.ensure_dashboard_hosts()
+
 
 
         if not os.path.exists(www_path):

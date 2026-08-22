@@ -260,8 +260,12 @@ class Config:
                 with open(config_file, "r", encoding="utf-8") as f:
                     content = f.read()
                 
+                content = re.sub(r"\['blowfish_secret'\]\s*=\s*''", "['blowfish_secret'] = 'piruwamp_secret_key_32_bytes_long_12345'", content)
+
                 content = re.sub(r"\['host'\]\s*=\s*'localhost'", "['host'] = '127.0.0.1'", content)
                 content = re.sub(r"\['auth_type'\]\s*=\s*'cookie'", "['auth_type'] = 'config'", content)
+                if "['port']" not in content:
+                    content = re.sub(r"(\['host'\]\s*=\s*'127\.0\.0\.1';)", r"\1\n$cfg['Servers'][$i]['port'] = '3306';\n$cfg['Servers'][$i]['connect_type'] = 'tcp';", content)
                 if "['user']" not in content:
                     content = re.sub(r"(\['auth_type'\]\s*=\s*'config';)", r"\1\n$cfg['Servers'][$i]['user'] = 'root';\n$cfg['Servers'][$i]['password'] = '';", content)
                 content = re.sub(r"\['AllowNoPassword'\]\s*=\s*false", "['AllowNoPassword'] = true", content)
@@ -270,6 +274,7 @@ class Config:
                     f.write(content)
             except Exception as e:
                 print(f"Error configurando auto-login en {config_file}: {e}")
+
 
     def deploy_phpmyadmin_to_app(self, version):
         """Copia la version original desde bin/phpmyadmin a app/phpmyadmin."""
