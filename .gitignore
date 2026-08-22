@@ -26,7 +26,7 @@ www/*
 !www/index.php
 
 # Aplicaciones desplegadas en ejecución
-app/phpmyadmin/*
-!app/phpmyadmin/.gitignore
+app/phpmyadmin/
+
 
 __init__.py

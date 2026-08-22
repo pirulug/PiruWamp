@@ -1,3 +1,7 @@
-*
-!/web/
+# Ignorar completamente la carpeta phpmyadmin
+phpmyadmin/
+
+# Incluir unicamente la carpeta web y todos sus archivos
+!web/
+!web/**
 !.gitignore
