@@ -74,8 +74,32 @@ class MariaDBService(BaseService):
                 else:
                     new_lines.append(line)
 
-            with open(my_ini_path, "w", encoding="utf-8") as f:
-                f.writelines(new_lines)
-            logger.log("my.ini actualizado", self.name)
+            content_str = "".join(new_lines)
+            if "skip-name-resolve" not in content_str:
+                perf_block = """
+skip-name-resolve
+bind-address=0.0.0.0
+max_connections=150
+table_open_cache=2000
+innodb_buffer_pool_size=1G
+innodb_buffer_pool_instances=4
+innodb_log_file_size=128M
+innodb_log_buffer_size=32M
+innodb_flush_log_at_trx_commit=2
+innodb_read_io_threads=8
+innodb_write_io_threads=8
+innodb_thread_concurrency=0
+innodb_file_per_table=1
+query_cache_size=64M
+query_cache_type=1
+"""
+                content_str = content_str.replace("[mysqld]", f"[mysqld]\n{perf_block}")
+                with open(my_ini_path, "w", encoding="utf-8") as f:
+                    f.write(content_str)
+            else:
+                with open(my_ini_path, "w", encoding="utf-8") as f:
+                    f.writelines(new_lines)
+            logger.log("my.ini actualizado con optimizaciones de rendimiento", self.name)
+
         except Exception as e:
             logger.log(f"Error actualizando my.ini: {e}", self.name)

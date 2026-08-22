@@ -35,11 +35,43 @@ class PHPManager:
                 # Si no se encuentra el patrón típico, forzarlo bajo [PHP]
                 content = content.replace("[PHP]", f"[PHP]\nextension_dir = \"{new_ext_dir}\"")
 
+            # 2. Ajustes de Rendimiento y Memoria (12 nucleos / 16GB RAM)
+            content = re.sub(r'^;?memory_limit\s*=.*', 'memory_limit = 512M', content, flags=re.M)
+            content = re.sub(r'^;?max_execution_time\s*=.*', 'max_execution_time = 120', content, flags=re.M)
+            content = re.sub(r'^;?upload_max_filesize\s*=.*', 'upload_max_filesize = 128M', content, flags=re.M)
+            content = re.sub(r'^;?post_max_size\s*=.*', 'post_max_size = 128M', content, flags=re.M)
+            content = re.sub(r'^;?realpath_cache_size\s*=.*', 'realpath_cache_size = 4096k', content, flags=re.M)
+            content = re.sub(r'^;?realpath_cache_ttl\s*=.*', 'realpath_cache_ttl = 600', content, flags=re.M)
+            content = re.sub(r'^;?default_socket_timeout\s*=.*', 'default_socket_timeout = 60', content, flags=re.M)
+
+            # 3. Zend OPcache para acelerar compilacion de scripts en RAM
+            if "zend_extension=opcache" not in content and "zend_extension = opcache" not in content:
+                opcache_config = """
+; --- PiruWamp OPcache High Performance ---
+zend_extension=opcache
+opcache.enable=1
+opcache.enable_cli=0
+opcache.memory_consumption=256
+opcache.interned_strings_buffer=16
+opcache.max_accelerated_files=20000
+opcache.validate_timestamps=1
+opcache.revalidate_freq=0
+opcache.fast_shutdown=1
+"""
+                content += opcache_config
+            else:
+                # Asegurar activado
+                content = re.sub(r'^;?opcache\.enable\s*=.*', 'opcache.enable=1', content, flags=re.M)
+                content = re.sub(r'^;?opcache\.memory_consumption\s*=.*', 'opcache.memory_consumption=256', content, flags=re.M)
+                content = re.sub(r'^;?opcache\.max_accelerated_files\s*=.*', 'opcache.max_accelerated_files=20000', content, flags=re.M)
+                content = re.sub(r'^;?opcache\.revalidate_freq\s*=.*', 'opcache.revalidate_freq=0', content, flags=re.M)
+
             with open(php_ini_path, "w", encoding="utf-8") as f:
                 f.write(content)
-            logger.log("php.ini actualizado (extension_dir)", "PHP")
+            logger.log("php.ini actualizado (extension_dir, OPcache y rendimiento)", "PHP")
         except Exception as e:
             logger.log(f"Error actualizando php.ini: {e}", "PHP")
+
 
     @staticmethod
     def toggle_extension(ext_name: str):

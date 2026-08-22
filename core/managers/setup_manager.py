@@ -32,81 +32,121 @@ class SetupManager:
         return False
 
     @classmethod
-    def get_missing_components(cls):
-        """Devuelve la lista de componentes que necesitan descarga e instalacion."""
-        missing = []
-        
-        if not ApacheRepository.get_installed_versions() or not config.apache_path:
-            avail = ApacheRepository.load_available_versions()
-            if avail:
-                ver_name = list(avail.keys())[0]
-                missing.append({
-                    "id": "apache",
-                    "title": "Apache HTTP Server",
-                    "version": ver_name,
-                    "url": avail[ver_name],
-                    "repo": ApacheRepository,
-                    "setter": config.set_apache_version
-                })
+    def get_service_options(cls):
+        """Devuelve la informacion y lista de versiones disponibles de cada servicio para seleccion."""
+        services = []
 
-        if not PHPRepository.get_installed_versions() or not config.php_path:
-            avail = PHPRepository.load_available_versions()
-            if avail:
-                ver_name = list(avail.keys())[0]
-                missing.append({
-                    "id": "php",
-                    "title": "PHP",
-                    "version": ver_name,
-                    "url": avail[ver_name],
-                    "repo": PHPRepository,
-                    "setter": config.set_php_version
-                })
+        # 1. Apache
+        apache_avail = ApacheRepository.load_available_versions()
+        apache_installed = ApacheRepository.get_installed_versions()
+        apache_list = list(apache_avail.keys())
+        services.append({
+            "id": "apache",
+            "title": "Apache HTTP Server",
+            "available": apache_avail,
+            "versions": apache_list,
+            "installed": apache_installed,
+            "selected": config.active_apache_version if config.active_apache_version in apache_list else (apache_list[0] if apache_list else ""),
+            "repo": ApacheRepository,
+            "setter": config.set_apache_version
+        })
 
-        if not MariaDBRepository.get_installed_versions() or not config.mariadb_path:
-            avail = MariaDBRepository.load_available_versions()
-            if avail:
-                ver_name = list(avail.keys())[0]
-                missing.append({
-                    "id": "mariadb",
-                    "title": "MariaDB Database",
-                    "version": ver_name,
-                    "url": avail[ver_name],
-                    "repo": MariaDBRepository,
-                    "setter": config.set_mariadb_version
-                })
+        # 2. PHP
+        php_avail = PHPRepository.load_available_versions()
+        php_installed = PHPRepository.get_installed_versions()
+        php_list = list(php_avail.keys())
+        services.append({
+            "id": "php",
+            "title": "PHP",
+            "available": php_avail,
+            "versions": php_list,
+            "installed": php_installed,
+            "selected": config.active_php_version if config.active_php_version in php_list else (php_list[0] if php_list else ""),
+            "repo": PHPRepository,
+            "setter": config.set_php_version
+        })
 
-        if not PHPMYAdminRepository.get_installed_versions() or not config.phpmyadmin_path:
-            avail = PHPMYAdminRepository.load_available_versions()
-            if avail:
-                ver_name = list(avail.keys())[0]
-                missing.append({
-                    "id": "phpmyadmin",
-                    "title": "phpMyAdmin",
-                    "version": ver_name,
-                    "url": avail[ver_name],
-                    "repo": PHPMYAdminRepository,
-                    "setter": config.set_phpmyadmin_version
-                })
+        # 3. MariaDB
+        mariadb_avail = MariaDBRepository.load_available_versions()
+        mariadb_installed = MariaDBRepository.get_installed_versions()
+        mariadb_list = list(mariadb_avail.keys())
+        services.append({
+            "id": "mariadb",
+            "title": "MariaDB Database",
+            "available": mariadb_avail,
+            "versions": mariadb_list,
+            "installed": mariadb_installed,
+            "selected": config.active_mariadb_version if config.active_mariadb_version in mariadb_list else (mariadb_list[0] if mariadb_list else ""),
+            "repo": MariaDBRepository,
+            "setter": config.set_mariadb_version
+        })
 
-        return missing
+        # 4. phpMyAdmin
+        pma_avail = PHPMYAdminRepository.load_available_versions()
+        pma_installed = PHPMYAdminRepository.get_installed_versions()
+        pma_list = list(pma_avail.keys())
+        services.append({
+            "id": "phpmyadmin",
+            "title": "phpMyAdmin",
+            "available": pma_avail,
+            "versions": pma_list,
+            "installed": pma_installed,
+            "selected": config.active_phpmyadmin_version if config.active_phpmyadmin_version in pma_list else (pma_list[0] if pma_list else ""),
+            "repo": PHPMYAdminRepository,
+            "setter": config.set_phpmyadmin_version
+        })
+
+        return services
 
     @classmethod
-    def install_component(cls, component_info, progress_callback=None):
-        """Descarga e instala un componente especifico."""
-        repo = component_info["repo"]
-        version_name = component_info["version"]
-        url = component_info["url"]
-        setter = component_info["setter"]
+    def install_selected_components(cls, selections, progress_callback=None, task_callback=None):
+        """Descarga e instala las versiones seleccionadas por el usuario."""
+        services = cls.get_service_options()
+        total_items = len(services)
 
-        logger.log(f"Iniciando instalacion automatica de {component_info['title']} ({version_name})...", "Setup")
-        success = repo.download_and_install(version_name, url, progress_callback=progress_callback)
-        if success:
-            setter(version_name)
-            logger.log(f"{component_info['title']} instalado y configurado como version activa.", "Setup")
-            return True
-        else:
-            logger.log(f"Error durante la instalacion de {component_info['title']}.", "Setup")
-            return False
+        for idx, srv in enumerate(services, 1):
+            srv_id = srv["id"]
+            title = srv["title"]
+            repo = srv["repo"]
+            setter = srv["setter"]
+            selected_ver = selections.get(srv_id, srv["selected"])
+            url = srv["available"].get(selected_ver, "")
+
+            # Verificar si ya esta instalado localmente
+            installed = repo.get_installed_versions()
+            if selected_ver in installed:
+                if task_callback:
+                    task_callback(f"Configurando {title}...", f"Version {selected_ver} ya instalada localmente.")
+                setter(selected_ver)
+                if progress_callback:
+                    progress_callback(idx, total_items, title, 100)
+                continue
+
+            if not url:
+                logger.log(f"No se encontro URL de descarga para {title} ({selected_ver})", "Setup")
+                return False, f"URL no encontrada para {title} {selected_ver}"
+
+            if task_callback:
+                task_callback(f"Descargando {title} ({idx}/{total_items})...", f"Version seleccionada: {selected_ver}")
+
+            def on_progress(pct):
+                if progress_callback:
+                    progress_callback(idx, total_items, title, pct)
+
+            logger.log(f"Iniciando descarga e instalacion de {title} ({selected_ver})...", "Setup")
+            success = repo.download_and_install(selected_ver, url, progress_callback=on_progress)
+            if not success:
+                logger.log(f"Error descargando {title} ({selected_ver})", "Setup")
+                return False, f"Error descargando {title} {selected_ver}"
+
+            setter(selected_ver)
+            logger.log(f"{title} ({selected_ver}) instalado correctamente.", "Setup")
+
+        if task_callback:
+            task_callback("Configurando entorno...", "Enlazando servicios seleccionados...")
+
+        cls.finalize_configuration()
+        return True, "Instalacion completada con exito."
 
     @classmethod
     def finalize_configuration(cls):

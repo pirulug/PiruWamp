@@ -67,6 +67,25 @@ class ApacheService(BaseService):
             if "HostnameLookups Off" not in content:
                 content += "\nHostnameLookups Off\nUseCanonicalName Off\n"
 
+            # Optimizaciones de rendimiento para Windows (12 nucleos / 16GB RAM)
+            perf_block = """
+# Optimizaciones de rendimiento PiruWamp
+AcceptFilter http none
+AcceptFilter https none
+EnableSendfile Off
+EnableMMAP Off
+KeepAlive On
+MaxKeepAliveRequests 500
+KeepAliveTimeout 5
+<IfModule mpm_winnt_module>
+    ThreadsPerChild 250
+    MaxConnectionsPerChild 0
+</IfModule>
+"""
+            if "AcceptFilter http none" not in content:
+                content += perf_block
+
+
 
             # 4. Asegurar que existan los Includes al final y actualizarlos si ya existen
             def update_or_add_include(text, filename_pattern, new_include):
