@@ -53,11 +53,12 @@ class PHPMYAdminRepository:
         
         try:
             import ssl
+            import shutil
             context = ssl._create_unverified_context()
             
             headers = {
-                'User-Agent': 'Mozilla/5.0',
-                'Accept': '*/*'
+                "User-Agent": "Mozilla/5.0",
+                "Accept": "*/*"
             }
 
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -65,9 +66,9 @@ class PHPMYAdminRepository:
                 
                 req = urllib.request.Request(url, headers=headers)
                 with urllib.request.urlopen(req, context=context) as response:
-                    total_size = int(response.headers.get('content-length', 0))
+                    total_size = int(response.headers.get("content-length", 0))
                     downloaded = 0
-                    with open(zip_path, 'wb') as out_file:
+                    with open(zip_path, "wb") as out_file:
                         while True:
                             chunk = response.read(8192)
                             if not chunk:
@@ -79,11 +80,30 @@ class PHPMYAdminRepository:
                                 progress_callback(percent)
 
                 logger.log(f"Extrayendo {version_name}...", "Repo")
+                extract_path = os.path.join(tmpdir, "extracted")
+                os.makedirs(extract_path, exist_ok=True)
+                with zipfile.ZipFile(zip_path, "r") as zip_ref:
+                    zip_ref.extractall(extract_path)
+
+                # Si el ZIP contiene una subcarpeta raiz (ej: phpMyAdmin-5.2.3-all-languages), aplanar
+                source_dir = extract_path
+                extracted_items = os.listdir(extract_path)
+                if len(extracted_items) == 1 and os.path.isdir(os.path.join(extract_path, extracted_items[0])):
+                    source_dir = os.path.join(extract_path, extracted_items[0])
+                else:
+                    for item in extracted_items:
+                        sub = os.path.join(extract_path, item)
+                        if os.path.isdir(sub) and os.path.exists(os.path.join(sub, "index.php")):
+                            source_dir = sub
+                            break
+
                 os.makedirs(target_dir, exist_ok=True)
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
-                    zip_ref.extractall(target_dir)
+                for item in os.listdir(source_dir):
+                    s = os.path.join(source_dir, item)
+                    d = os.path.join(target_dir, item)
+                    shutil.move(s, d)
                 
-                # Configurar auto-login automáticamente
+                # Configurar auto-login automaticamente
                 cls._configure_autologin(target_dir)
 
                 logger.log(f"{version_name} instalado correctamente en {target_dir}", "Repo")
@@ -91,6 +111,7 @@ class PHPMYAdminRepository:
         except Exception as e:
             logger.log(f"Error instalando {version_name}: {e}", "Repo")
             return False
+
 
     @classmethod
     def _configure_autologin(cls, target_dir):
