@@ -1,0 +1,2 @@
+1 [Completado] cuando se crea un nuevo proyecto se reinicie apache para que vhost se actualizen
+2 agregar una pestaña para corregir la actualización mariadb aveces no inicia bien

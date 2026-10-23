@@ -84,10 +84,13 @@ def main():
                 "build.py", "clean.py", "wamp.spec", "main.spec", "piruwamp.spec",
                 ".compile", ".build", "_build", "build", "dist",
                 "*.iss", "wamp.exe", "main.exe", "piruwamp", "core", "app",
-                "crash.log", "*.log", "_doc", ".agents", "scratch"
+                "crash.log", "*.log", "_doc", ".agents", ".agentes", "scratch",
+                "*.md", "Corregir.txt", "requirements.txt", "requite.txt", "app.manifest"
             ]
             for pattern in patterns:
-                ignored.update(fnmatch.filter(names, pattern))
+                for name in names:
+                    if fnmatch.fnmatch(name.lower(), pattern.lower()):
+                        ignored.add(name)
 
             abs_src = os.path.abspath(".")
             abs_path = os.path.abspath(path)

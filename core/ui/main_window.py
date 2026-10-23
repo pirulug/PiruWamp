@@ -430,6 +430,8 @@ class MainWindow:
 
     def restart_apache(self):
         self.apache.stop()
+        import time
+        time.sleep(0.5)
         if self.apache.start():
             self.btn_apache.config(text="Detener Apache")
             style_button(self.btn_apache)
@@ -478,16 +480,24 @@ class MainWindow:
     def gui_create_project(self):
         name = simpledialog.askstring("Nuevo Proyecto", "Nombre del proyecto:")
         if name:
+            name = name.strip()
+            if not name:
+                return
             project_dir = os.path.join(config.www_path, name)
             os.makedirs(project_dir, exist_ok=True)
             index_file = os.path.join(project_dir, "index.php")
             if not os.path.exists(index_file):
                 with open(index_file, "w", encoding="utf-8") as f:
-                    f.write(f"<?php echo '<h1>Hola desde {name}</h1>'; ?>")
+                    f.write(f"<?php echo \"<h1>Hola desde {name}</h1>\"; ?>")
             
             self.vhost_manager.sync_sites(self.hosts_manager)
-            messagebox.showinfo("Proyecto Creado", f"Proyecto '{name}' creado correctamente.")
             self.update_projects_menu()
+
+            if self.apache.is_running():
+                self.restart_apache()
+                messagebox.showinfo("Proyecto Creado", f"Proyecto \"{name}\" creado correctamente.\nApache se ha reiniciado para actualizar los sitios virtuales ({name}.test).")
+            else:
+                messagebox.showinfo("Proyecto Creado", f"Proyecto \"{name}\" creado correctamente.")
 
     def update_projects_menu(self):
         self.menu_proyectos.delete(0, tk.END)
