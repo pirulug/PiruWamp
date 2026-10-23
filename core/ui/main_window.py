@@ -33,14 +33,22 @@ class MainWindow:
         apply_window_style(self.root)
         
         # Intentar cargar icono si existe
-        icon_path = os.path.join(config.wamp_root, "core", "img", "icon.ico")
-        if not os.path.exists(icon_path):
-            icon_path = os.path.join(config.wamp_root, "icon.ico")
-        if os.path.exists(icon_path):
-            try:
-                self.root.iconbitmap(icon_path)
-            except Exception:
-                pass
+        icon_candidates = [
+            os.path.join(config.wamp_root, "core", "img", "icon.ico"),
+            os.path.join(config.wamp_root, "icon.ico"),
+            os.path.join(config.wamp_root, "_internal", "core", "img", "icon.ico")
+        ]
+        for candidate in icon_candidates:
+            if os.path.exists(candidate):
+                try:
+                    self.root.iconbitmap(default=candidate)
+                    break
+                except Exception:
+                    try:
+                        self.root.iconbitmap(candidate)
+                        break
+                    except Exception:
+                        pass
 
         self.apache = ApacheService()
         self.mariadb = MariaDBService()
@@ -75,6 +83,7 @@ class MainWindow:
         self.update_projects_menu()
         self.update_php_extensions_menu()
         self.refresh_locations_view()
+        self.update_services_buttons()
 
     def _on_setup_complete(self):
         self.apache = ApacheService()
@@ -381,27 +390,34 @@ class MainWindow:
 
         schedule_monitor()
 
+    def update_services_buttons(self):
+        if self.apache.is_running():
+            self.btn_apache.config(text="Detener Apache")
+        else:
+            self.btn_apache.config(text="Iniciar Apache")
+        style_button(self.btn_apache)
+
+        if self.mariadb.is_running():
+            self.btn_mariadb.config(text="Detener MariaDB")
+        else:
+            self.btn_mariadb.config(text="Iniciar Base de Datos")
+        style_button(self.btn_mariadb)
+
+        self.update_both_button()
+
     def toggle_apache(self):
         if self.apache.is_running():
             self.apache.stop()
-            self.btn_apache.config(text="Iniciar Apache")
-            style_button(self.btn_apache)
         else:
-            if self.apache.start():
-                self.btn_apache.config(text="Detener Apache")
-                style_button(self.btn_apache)
-        self.update_both_button()
+            self.apache.start()
+        self.update_services_buttons()
 
     def toggle_mariadb(self):
         if self.mariadb.is_running():
             self.mariadb.stop()
-            self.btn_mariadb.config(text="Iniciar Base de Datos")
-            style_button(self.btn_mariadb)
         else:
-            if self.mariadb.start():
-                self.btn_mariadb.config(text="Detener MariaDB")
-                style_button(self.btn_mariadb)
-        self.update_both_button()
+            self.mariadb.start()
+        self.update_services_buttons()
 
     def toggle_both(self):
         if not self.apache.is_running() and not self.mariadb.is_running():
@@ -410,36 +426,14 @@ class MainWindow:
         else:
             self.apache.stop()
             self.mariadb.stop()
-        
-        # Update buttons
-        if self.apache.is_running():
-            self.btn_apache.config(text="Detener Apache")
-            style_button(self.btn_apache)
-        else:
-            self.btn_apache.config(text="Iniciar Apache")
-            style_button(self.btn_apache)
-            
-        if self.mariadb.is_running():
-            self.btn_mariadb.config(text="Detener MariaDB")
-            style_button(self.btn_mariadb)
-        else:
-            self.btn_mariadb.config(text="Iniciar Base de Datos")
-            style_button(self.btn_mariadb)
-            
-        self.update_both_button()
+        self.update_services_buttons()
 
     def restart_apache(self):
         self.apache.stop()
         import time
         time.sleep(0.5)
-        if self.apache.start():
-            self.btn_apache.config(text="Detener Apache")
-            style_button(self.btn_apache)
-            logger.log("Apache reiniciado", "Apache")
-        else:
-            self.btn_apache.config(text="Iniciar Apache")
-            style_button(self.btn_apache)
-        self.update_both_button()
+        self.apache.start()
+        self.update_services_buttons()
 
     def update_both_button(self):
         if self.apache.is_running() and self.mariadb.is_running():

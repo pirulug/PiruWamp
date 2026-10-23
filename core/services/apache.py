@@ -1,6 +1,7 @@
 import os
 import re
 import glob
+import subprocess
 from .base import BaseService
 from ..core.config import config
 from ..core.logger import logger
@@ -9,9 +10,55 @@ class ApacheService(BaseService):
     def __init__(self):
         super().__init__("Apache", config.apache_exe)
 
+    def is_running(self):
+        if self.process is not None and self.process.poll() is None:
+            return True
+        try:
+            output = subprocess.check_output(
+                ["tasklist", "/FI", "IMAGENAME eq httpd.exe", "/NH"],
+                creationflags=subprocess.CREATE_NO_WINDOW,
+                text=True
+            )
+            return "httpd.exe" in output.lower()
+        except Exception:
+            return False
+
     def start(self):
+        if self.is_running() and (self.process is None or self.process.poll() is not None):
+            logger.log("Detectado proceso httpd.exe huerfano en ejecucion. Cerrando para liberar puerto 80...", self.name)
+            self.stop()
+            import time
+            time.sleep(0.5)
+
         self.update_configs()
         return super().start()
+
+    def stop(self):
+        if self.process:
+            try:
+                subprocess.run(
+                    ["taskkill", "/F", "/T", "/PID", str(self.process.pid)],
+                    capture_output=True,
+                    creationflags=subprocess.CREATE_NO_WINDOW
+                )
+            except Exception:
+                try:
+                    self.process.terminate()
+                except Exception:
+                    pass
+            self.process = None
+
+        try:
+            subprocess.run(
+                ["taskkill", "/F", "/IM", "httpd.exe", "/T"],
+                capture_output=True,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
+        except Exception:
+            pass
+
+        logger.log("Detenido", self.name)
+        return True
 
     def update_configs(self):
         from ..managers.php_manager import PHPManager

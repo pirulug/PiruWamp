@@ -12,6 +12,7 @@ def clean_project():
         ".compile",
         "build",
         "dist",
+        "_internal",
         ".pytest_cache",
         ".mypy_cache"
     ]

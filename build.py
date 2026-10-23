@@ -22,15 +22,23 @@ def main():
     icon_path = os.path.abspath(os.path.join("core", "img", "icon.ico"))
     if not os.path.exists(icon_path):
         icon_path = os.path.abspath("icon.ico")
-    main_path = os.path.abspath("piruwamp.py")
+    else:
+        root_icon = os.path.abspath("icon.ico")
+        if not os.path.exists(root_icon):
+            try:
+                shutil.copy2(icon_path, root_icon)
+            except Exception:
+                pass
 
+    main_path = os.path.abspath("piruwamp.py")
 
     cmd = [
         sys.executable, "-m", "PyInstaller",
-        "--onefile",
+        "--onedir",
         "--noconsole",
         "--manifest", manifest_path,
-        f"--icon={icon_path}",
+        "--icon", icon_path,
+        f"--add-data={icon_path}{os.pathsep}core/img",
         "--workpath", work_dir,
         "--distpath", dist_dir,
         "--specpath", spec_dir,
@@ -46,17 +54,25 @@ def main():
         print("Error: La compilacion con PyInstaller fallo.")
         sys.exit(result.returncode)
         
-    src_exe = os.path.join(dist_dir, "piruwamp.exe")
+    dist_output = os.path.join(dist_dir, "piruwamp")
+    src_exe = os.path.join(dist_output, "piruwamp.exe")
     
     if not os.path.exists(src_exe):
         print(f"Error: No se encontro el ejecutable generado en {src_exe}")
         sys.exit(1)
 
-    # 3. Limpiar cualquier ejecutable residual en la raiz
+    # 3. Limpiar cualquier ejecutable o carpeta runtime residual en la raiz
     root_exe = os.path.abspath("piruwamp.exe")
     if os.path.exists(root_exe):
         try:
             os.remove(root_exe)
+        except Exception:
+            pass
+
+    root_internal = os.path.abspath("_internal")
+    if os.path.exists(root_internal):
+        try:
+            shutil.rmtree(root_internal)
         except Exception:
             pass
 
@@ -116,11 +132,20 @@ def main():
         # Copiar estructura base
         shutil.copytree(".", build_dest, ignore=ignore_patterns, dirs_exist_ok=True)
 
-        # Copiar el ejecutable piruwamp.exe dentro de _build
-        shutil.copy2(src_exe, os.path.join(build_dest, "piruwamp.exe"))
+        # Copiar los binarios y runtime de PyInstaller (--onedir) dentro de _build
+        for item in os.listdir(dist_output):
+            src_item = os.path.join(dist_output, item)
+            dst_item = os.path.join(build_dest, item)
+            if os.path.isdir(src_item):
+                shutil.copytree(src_item, dst_item, dirs_exist_ok=True)
+            else:
+                shutil.copy2(src_item, dst_item)
 
-        # Asegurar copia del icono unicamente en la raiz de _build
+        # Asegurar copia del icono tanto en core/img/icon.ico como en la raiz de _build
         if os.path.exists(icon_path):
+            core_img_dir = os.path.join(build_dest, "core", "img")
+            os.makedirs(core_img_dir, exist_ok=True)
+            shutil.copy2(icon_path, os.path.join(core_img_dir, "icon.ico"))
             shutil.copy2(icon_path, os.path.join(build_dest, "icon.ico"))
 
 

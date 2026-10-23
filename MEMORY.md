@@ -29,8 +29,8 @@ El objetivo principal es permitir a los desarrolladores cambiar de version de PH
 3. Resolucion Inteligente de Imagick:
    `PHPManager` y `setup_manager.py` detectan la version de PHP activa, consultan el catalogo PECL correspondiente e instalan `php_imagick.dll` junto con las dependencias `CORE_RL_*.dll` e `IM_MOD_RL_*.dll` requeridas por ImageMagick en Windows.
 
-4. Flujo de Compilacion Aislado:
-   El script `build.py` utiliza la carpeta temporal `.compile/` para evitar ensuciar la raiz con artefactos intermedios. El resultado final se empaqueta en `_build/`, excluyendo el codigo fuente Python y dejando exclusivamente los binarios y archivos de configuracion minimos para produccion.
+4. Flujo de Compilacion Aislado (--onedir):
+   El script `build.py` utiliza PyInstaller en modo `--onedir` para evitar la autoextraccion a carpetas temporales y descartar falsos positivos de antivirus. Los artefactos intermedios se procesan en `.compile/` y el resultado final se estructura limpiamente en `_build/`, conteniendo `piruwamp.exe`, el directorio runtime `_internal/`, los binarios y carpetas del servidor sin archivos de codigo fuente Python ni documentacion.
 
 5. Saneamiento Automatizado:
    `clean.py` recorre el arbol de directorios para purgar `__pycache__`, `.pyc`, `.pyo`, `.spec` y carpetas de cache temporales sin tocar `bin/` ni `data/`.

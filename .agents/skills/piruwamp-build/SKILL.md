@@ -20,15 +20,16 @@ Esta habilidad detalla el flujo de trabajo estandar para compilar PiruWamp a un 
    `python build.py`
 
 2. Comportamiento del script de compilacion:
+   - Compila con PyInstaller en modo `--onedir` para evitar extracciones a carpetas temporales y descartar falsos positivos de antivirus.
    - Utiliza la carpeta `.compile/` como espacio de trabajo temporal para `build/`, `dist/` y el archivo de especificaciones `.spec`.
    - Incrusta el archivo de manifiesto `app.manifest` para asegurar la solicitud de privilegios de Administrador (UAC).
    - Asigna el icono oficial ubicado en `core/img/icon.ico`.
-   - Limpia residuos en la raiz y copia la distribucion limpia con binarios, configuraciones y assets a la carpeta `_build/`.
+   - Copia los binarios generados (`piruwamp.exe` y la carpeta runtime `_internal/`) y la estructura limpia a la carpeta `_build/`.
 
 3. Verificacion de la compilacion:
-   - Validar que exista el ejecutable en `_build/piruwamp.exe`.
+   - Validar que exista el ejecutable en `_build/piruwamp.exe` y la carpeta runtime `_build/_internal/`.
    - Comprobar que en `_build/` se hayan incluido las carpetas `bin/`, `data/`, `etc/`, `tmp/` y `www/`.
-   - Asegurarse de que no se hayan copiado archivos de codigo fuente Python (`.py`) dentro de `_build/`.
+   - Asegurarse de que no se hayan copiado archivos de codigo fuente Python (`.py`) ni documentacion `.md` dentro de `_build/`.
 
 ## Pasos para Limpieza de Temporales
 
