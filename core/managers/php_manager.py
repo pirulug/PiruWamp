@@ -66,11 +66,14 @@ opcache.fast_shutdown=1
                 content = re.sub(r'^;?opcache\.max_accelerated_files\s*=.*', 'opcache.max_accelerated_files=20000', content, flags=re.M)
                 content = re.sub(r'^;?opcache\.revalidate_freq\s*=.*', 'opcache.revalidate_freq=0', content, flags=re.M)
 
+            # 4. Limpiar extensiones inexistentes como iconv (incorporada en el nucleo de PHP)
+            content = re.sub(r"^;?\s*extension\s*=\s*iconv(\.dll)?\s*[\r\n]+", "", content, flags=re.M)
+
             with open(php_ini_path, "w", encoding="utf-8") as f:
                 f.write(content)
             logger.log("php.ini actualizado (extension_dir, OPcache y rendimiento)", "PHP")
 
-            # 4. Asegurar extensiones requeridas por phpMyAdmin y entorno moderno (sodium, mysqli, etc.)
+            # 5. Asegurar extensiones requeridas por phpMyAdmin y entorno moderno (sodium, mysqli, etc.)
             from .setup_manager import SetupManager
             active_exts = config.php_extensions or SetupManager.DEFAULT_EXTENSIONS
             PHPManager.sync_extensions(active_exts)
@@ -280,6 +283,7 @@ opcache.fast_shutdown=1
         
         try:
             import re
+            enabled_extensions = [ext for ext in enabled_extensions if ext != "iconv"]
             with open(php_ini_path, "r", encoding="utf-8") as f:
                 lines = f.readlines()
             
@@ -294,6 +298,10 @@ opcache.fast_shutdown=1
                     is_commented = match.group(1) is not None
                     ext_name = match.group(2).replace("php_", "").replace(".dll", "")
                     raw_name = match.group(2)
+
+                    if ext_name == "iconv" or raw_name == "iconv":
+                        changed = True
+                        continue
                     
                     if (ext_name in enabled_extensions or raw_name in enabled_extensions) and is_commented:
                         new_line = re.sub(r'^;extension', 'extension', line)
@@ -311,7 +319,7 @@ opcache.fast_shutdown=1
 
             # Si alguna extension requerida no estaba en el archivo php.ini, agregarla al final
             for ext in enabled_extensions:
-                if ext not in found_exts and f"php_{ext}.dll" not in found_exts:
+                if ext != "iconv" and ext not in found_exts and f"php_{ext}.dll" not in found_exts:
                     new_lines.append(f"extension={ext}\n")
                     changed = True
 

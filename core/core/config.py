@@ -35,7 +35,7 @@ class Config:
                             k = k.strip()
                             v = v.strip()
                             if k == "php_extensions":
-                                data[k] = [x.strip() for x in v.split(",") if x.strip()]
+                                data[k] = [x.strip() for x in v.split(",") if x.strip() and x.strip() != "iconv"]
                             else:
                                 data[k] = v
                 

@@ -13,7 +13,7 @@ from .hosts import HostsManager
 
 class SetupManager:
     DEFAULT_EXTENSIONS = [
-        "bz2", "curl", "fileinfo", "gd", "gettext", "iconv",
+        "bz2", "curl", "fileinfo", "gd", "gettext",
         "intl", "mbstring", "exif", "mysqli", "openssl",
         "pdo_mysql", "pdo_sqlite", "zip", "sodium"
     ]

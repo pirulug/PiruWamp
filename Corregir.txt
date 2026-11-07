@@ -1,2 +1,3 @@
 1 [Completado] cuando se crea un nuevo proyecto se reinicie apache para que vhost se actualizen
-2 agregar una pestaña para corregir la actualización mariadb aveces no inicia bien
+2 [Completado] agregar una pestaña para corregir la actualización mariadb aveces no inicia bien
+3 [Completado] PHP Warning: Unable to load dynamic library iconv (remover extension=iconv ya que esta integrada en el nucleo de PHP)
