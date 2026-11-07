@@ -427,6 +427,7 @@ class Config:
         files = {
             os.path.join(self.wamp_root, "etc", "apache.conf"): 
                 "# Apache Versions Repository\n"
+                "apache-2.4.70 = https://www.apachelounge.com/download/VS18/binaries/httpd-2.4.70-261106-Win64-VS18.zip\n"
                 "apache-2.4.68 = https://www.apachelounge.com/download/VS18/binaries/httpd-2.4.68-260617-Win64-VS18.zip\n",
             
             os.path.join(self.wamp_root, "etc", "mariadb.conf"):
@@ -437,10 +438,12 @@ class Config:
             
             os.path.join(self.wamp_root, "etc", "php.conf"):
                 "# PHP Versions Repository\n"
+                "php-8.5.12 = https://windows.php.net/downloads/releases/archives/php-8.5.12-Win32-vs17-x64.zip\n"
+                "php-8.4.27 = https://windows.php.net/downloads/releases/archives/php-8.4.27-Win32-vs17-x64.zip\n"
                 "php-8.3.16 = https://windows.php.net/downloads/releases/archives/php-8.3.16-Win32-vs16-x64.zip\n"
                 "php-8.2.27 = https://windows.php.net/downloads/releases/archives/php-8.2.27-Win32-vs16-x64.zip\n"
-                "php-8.4.3 = https://windows.php.net/downloads/releases/archives/php-8.4.3-Win32-vs17-x64.zip\n"
                 "php-8.1.31 = https://windows.php.net/downloads/releases/archives/php-8.1.31-Win32-vs16-x64.zip\n"
+                "php-8.0.30 = https://windows.php.net/downloads/releases/archives/php-8.0.30-Win32-vs16-x64.zip\n"
                 "php-7.4.33 = https://windows.php.net/downloads/releases/archives/php-7.4.33-Win32-vc15-x64.zip\n",
             
             os.path.join(self.wamp_root, "etc", "phpmyadmin.conf"):

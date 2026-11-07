@@ -36,10 +36,13 @@ class PHPManager:
                 content = content.replace("[PHP]", f"[PHP]\nextension_dir = \"{new_ext_dir}\"")
 
             # 2. Ajustes de Rendimiento y Memoria (12 nucleos / 16GB RAM)
-            content = re.sub(r'^;?memory_limit\s*=.*', 'memory_limit = 512M', content, flags=re.M)
-            content = re.sub(r'^;?max_execution_time\s*=.*', 'max_execution_time = 120', content, flags=re.M)
-            content = re.sub(r'^;?upload_max_filesize\s*=.*', 'upload_max_filesize = 128M', content, flags=re.M)
-            content = re.sub(r'^;?post_max_size\s*=.*', 'post_max_size = 128M', content, flags=re.M)
+            if not re.search(r"^\s*memory_limit\s*=", content, flags=re.M):
+                content = re.sub(r"^\s*;?\s*memory_limit\s*=.*", "memory_limit = 512M", content, flags=re.M)
+            content = re.sub(r"^\s*;?\s*max_execution_time\s*=.*", "max_execution_time = 120", content, flags=re.M)
+            if not re.search(r"^\s*upload_max_filesize\s*=", content, flags=re.M):
+                content = re.sub(r"^\s*;?\s*upload_max_filesize\s*=.*", "upload_max_filesize = 128M", content, flags=re.M)
+            if not re.search(r"^\s*post_max_size\s*=", content, flags=re.M):
+                content = re.sub(r"^\s*;?\s*post_max_size\s*=.*", "post_max_size = 128M", content, flags=re.M)
             content = re.sub(r'^;?realpath_cache_size\s*=.*', 'realpath_cache_size = 4096k', content, flags=re.M)
             content = re.sub(r'^;?realpath_cache_ttl\s*=.*', 'realpath_cache_ttl = 600', content, flags=re.M)
             content = re.sub(r'^;?default_socket_timeout\s*=.*', 'default_socket_timeout = 60', content, flags=re.M)
@@ -79,6 +82,87 @@ opcache.fast_shutdown=1
             PHPManager.sync_extensions(active_exts)
         except Exception as e:
             logger.log(f"Error actualizando php.ini: {e}", "PHP")
+
+    @staticmethod
+    def get_php_limits():
+        """Obtiene upload_max_filesize y memory_limit del php.ini activo en megabytes."""
+        limits = {"upload_max_filesize": 128, "memory_limit": 512}
+        php_ini_path = config.php_ini
+        if not os.path.exists(php_ini_path):
+            return limits
+
+        try:
+            import re
+            with open(php_ini_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            upload_m = re.search(r"^\s*upload_max_filesize\s*=\s*(-?\d+)\s*([KMGkmg]?)", content, flags=re.M)
+            if upload_m:
+                val = int(upload_m.group(1))
+                unit = upload_m.group(2).upper()
+                if unit == "G":
+                    val *= 1024
+                elif unit == "K":
+                    val = max(1, val // 1024)
+                limits["upload_max_filesize"] = val
+
+            mem_m = re.search(r"^\s*memory_limit\s*=\s*(-?\d+)\s*([KMGkmg]?)", content, flags=re.M)
+            if mem_m:
+                val = int(mem_m.group(1))
+                if val == -1:
+                    limits["memory_limit"] = -1
+                else:
+                    unit = mem_m.group(2).upper()
+                    if unit == "G":
+                        val *= 1024
+                    elif unit == "K":
+                        val = max(1, val // 1024)
+                    limits["memory_limit"] = val
+        except Exception as e:
+            logger.log(f"Error leyendo límites de PHP: {e}", "PHP")
+
+        return limits
+
+    @staticmethod
+    def set_php_limits(upload_max_filesize_mb: int, memory_limit_mb: int):
+        """Actualiza upload_max_filesize, post_max_size y memory_limit en php.ini."""
+        php_ini_path = config.php_ini
+        if not os.path.exists(php_ini_path):
+            return False
+
+        try:
+            import re
+            with open(php_ini_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            upload_str = f"{upload_max_filesize_mb}M"
+            post_mb = max(upload_max_filesize_mb, 128)
+            post_str = f"{post_mb}M"
+            mem_str = "-1" if memory_limit_mb == -1 else f"{memory_limit_mb}M"
+
+            if re.search(r"^\s*;?\s*upload_max_filesize\s*=.*", content, flags=re.M):
+                content = re.sub(r"^\s*;?\s*upload_max_filesize\s*=.*", f"upload_max_filesize = {upload_str}", content, flags=re.M)
+            else:
+                content += f"\nupload_max_filesize = {upload_str}\n"
+
+            if re.search(r"^\s*;?\s*post_max_size\s*=.*", content, flags=re.M):
+                content = re.sub(r"^\s*;?\s*post_max_size\s*=.*", f"post_max_size = {post_str}", content, flags=re.M)
+            else:
+                content += f"\npost_max_size = {post_str}\n"
+
+            if re.search(r"^\s*;?\s*memory_limit\s*=.*", content, flags=re.M):
+                content = re.sub(r"^\s*;?\s*memory_limit\s*=.*", f"memory_limit = {mem_str}", content, flags=re.M)
+            else:
+                content += f"\nmemory_limit = {mem_str}\n"
+
+            with open(php_ini_path, "w", encoding="utf-8") as f:
+                f.write(content)
+
+            logger.log(f"Límites actualizados en php.ini: upload={upload_str}, mem={mem_str}", "PHP")
+            return True
+        except Exception as e:
+            logger.log(f"Error guardando límites de PHP: {e}", "PHP")
+            return False
 
 
 

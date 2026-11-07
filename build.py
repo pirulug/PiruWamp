@@ -44,6 +44,7 @@ def main():
         "--specpath", spec_dir,
         "--name", "piruwamp",
         "--clean",
+        "-y",
         main_path
     ]
     

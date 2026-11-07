@@ -46,8 +46,8 @@ class PHPRepository:
             context = ssl._create_unverified_context()
             
             headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept': '*/*'
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                "Accept": "*/*"
             }
 
             with tempfile.TemporaryDirectory() as tmpdir:
@@ -55,14 +55,14 @@ class PHPRepository:
                 
                 req = urllib.request.Request(url, headers=headers)
                 with urllib.request.urlopen(req, context=context) as response:
-                    content_type = response.headers.get('Content-Type', '')
-                    if 'text/html' in content_type:
+                    content_type = response.headers.get("Content-Type", "")
+                    if "text/html" in content_type:
                         logger.log(f"Error: El servidor bloqueó la descarga automática (devolvió HTML).", "Repo")
                         return False
 
-                    total_size = int(response.headers.get('content-length', 0))
+                    total_size = int(response.headers.get("content-length", 0))
                     downloaded = 0
-                    with open(zip_path, 'wb') as out_file:
+                    with open(zip_path, "wb") as out_file:
                         while True:
                             chunk = response.read(8192)
                             if not chunk:
@@ -75,7 +75,7 @@ class PHPRepository:
 
                 logger.log(f"Extrayendo {version_name}...", "Repo")
                 os.makedirs(target_dir, exist_ok=True)
-                with zipfile.ZipFile(zip_path, 'r') as zip_ref:
+                with zipfile.ZipFile(zip_path, "r") as zip_ref:
                     zip_ref.extractall(target_dir)
                 
                 logger.log(f"{version_name} instalado correctamente en {target_dir}", "Repo")
@@ -83,3 +83,18 @@ class PHPRepository:
         except Exception as e:
             logger.log(f"Error instalando {version_name}: {e}", "Repo")
             return False
+
+    @classmethod
+    def uninstall_version(cls, version_name):
+        """Desinstala una versión de PHP eliminando su carpeta."""
+        import shutil
+        target_dir = os.path.join(config.bin_php_path, version_name)
+        if os.path.exists(target_dir):
+            try:
+                shutil.rmtree(target_dir)
+                logger.log(f"Versión {version_name} desinstalada correctamente", "Repo")
+                return True
+            except Exception as e:
+                logger.log(f"Error desinstalando {version_name}: {e}", "Repo")
+                return False
+        return False
