@@ -130,6 +130,11 @@ innodb_read_io_threads=8
 innodb_write_io_threads=8
 innodb_file_per_table=1
 
+# Registro de consultas lentas para monitoreo
+slow_query_log=1
+slow_query_log_file={formatted_tmp}/mariadb_slow.log
+long_query_time=0.05
+
 [client]
 port=3306
 """

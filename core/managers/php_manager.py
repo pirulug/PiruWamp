@@ -72,11 +72,24 @@ opcache.fast_shutdown=1
             # 4. Limpiar extensiones inexistentes como iconv (incorporada en el nucleo de PHP)
             content = re.sub(r"^;?\s*extension\s*=\s*iconv(\.dll)?\s*[\r\n]+", "", content, flags=re.M)
 
+            # 5. Configurar log de errores de PHP en tmp/php_errors.log y helper de dump
+            php_errors_log = os.path.join(config.wamp_root, "tmp", "php_errors.log").replace("\\", "/")
+            os.makedirs(os.path.dirname(php_errors_log), exist_ok=True)
+            if re.search(r"^\s*;?\s*error_log\s*=.*", content, flags=re.M):
+                content = re.sub(r"^\s*;?\s*error_log\s*=.*", f'error_log = "{php_errors_log}"', content, flags=re.M)
+            else:
+                content += f'\nerror_log = "{php_errors_log}"\n'
+
+            dump_helper = os.path.join(config.wamp_root, "etc", "php_dump_helper.php").replace("\\", "/")
+            if os.path.exists(dump_helper):
+                if re.search(r"^\s*;\s*auto_prepend_file\s*=", content, flags=re.M) or re.search(r"^\s*auto_prepend_file\s*=\s*(\"\"?|'')\s*$", content, flags=re.M):
+                    content = re.sub(r"^\s*;?\s*auto_prepend_file\s*=.*", f'auto_prepend_file = "{dump_helper}"', content, flags=re.M)
+
             with open(php_ini_path, "w", encoding="utf-8") as f:
                 f.write(content)
             logger.log("php.ini actualizado (extension_dir, OPcache y rendimiento)", "PHP")
 
-            # 5. Asegurar extensiones requeridas por phpMyAdmin y entorno moderno (sodium, mysqli, etc.)
+            # 6. Asegurar extensiones requeridas por phpMyAdmin y entorno moderno (sodium, mysqli, etc.)
             from .setup_manager import SetupManager
             active_exts = config.php_extensions or SetupManager.DEFAULT_EXTENSIONS
             PHPManager.sync_extensions(active_exts)

@@ -16,6 +16,8 @@ from .apache_manager_window import ApacheManagerWindow
 from .php_extensions_window import PHPExtensionsWindow
 from .phpmyadmin_manager_window import PHPMYAdminManagerWindow
 from .mariadb_manager_window import MariaDBManagerWindow
+from .debug_window import DebugWindow
+from ..managers.live_monitor import live_monitor
 from .theme import apply_theme, apply_window_style, style_button, style_label, style_frame, BG_COLOR, FONT_TITLE
 
 class MainWindow:
@@ -81,6 +83,12 @@ class MainWindow:
         # 2. Sincronizar sitios virtuales y menus
         self.vhost_manager.sync_sites(self.hosts_manager)
         self.update_projects_menu()
+
+        # 3. Iniciar servicio de monitoreo en vivo (Insights)
+        try:
+            live_monitor.start()
+        except Exception:
+            pass
         self.update_php_extensions_menu()
         self.refresh_locations_view()
         self.update_services_buttons()
@@ -146,9 +154,13 @@ class MainWindow:
         btn_pma.grid(row=3, column=1, padx=5, pady=4)
         btn_restart.grid(row=3, column=0, padx=5, pady=4)
 
+        btn_debug = tk.Button(btn_frame, text="Consola Insights (Debug)", command=self.open_debug_window, width=25)
+        style_button(btn_debug)
+        btn_debug.grid(row=4, column=0, padx=5, pady=4)
+
         btn_exit = tk.Button(btn_frame, text="Salir", command=self.on_close, width=25)
         style_button(btn_exit)
-        btn_exit.grid(row=4, column=0, columnspan=2, padx=5, pady=4)
+        btn_exit.grid(row=4, column=1, padx=5, pady=4)
 
         # Log text
         self.log_text = scrolledtext.ScrolledText(self.tab_services, width=76, height=11, bg="#ffffff", fg="#000000", font=("Consolas", 9), relief="sunken", borderwidth=1)
@@ -373,6 +385,7 @@ class MainWindow:
         self.menu_ubicaciones.add_command(label="Abrir Carpeta www", command=self.open_www)
         self.menu_ubicaciones.add_command(label="Abrir Raíz de PiruWamp", command=lambda: os.startfile(config.wamp_root))
 
+        self.menubar.add_command(label="Insights", command=self.open_debug_window)
         self.menubar.add_command(label="Acerca de", command=lambda: messagebox.showinfo("Acerca de", "PiruWamp\n\nGestor WAMP ligero y portátil.\n\nAutor: Pirulug\nGitHub: https://github.com/pirulug"))
 
         self.root.config(menu=self.menubar)
@@ -530,8 +543,15 @@ class MainWindow:
     def open_mariadb_manager(self):
         MariaDBManagerWindow(self)
 
+    def open_debug_window(self):
+        DebugWindow(self)
+
     def on_close(self):
         logger.log("Cerrando PiruWamp y deteniendo servicios...", "System")
+        try:
+            live_monitor.stop()
+        except Exception:
+            pass
         self.apache.stop()
         self.mariadb.stop()
         self.root.destroy()
