@@ -51,6 +51,7 @@ class DebugWindow(tk.Toplevel):
         self.protocol("WM_DELETE_WINDOW", self._on_close)
 
         self.refresh_list()
+        self.after(400, self.refresh_list)
 
     def _setup_ui(self):
         # 1. Barra de Navegación Superior (Tabs: All, Dumps, Queries, HTTP, Logs)
