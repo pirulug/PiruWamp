@@ -28,4 +28,5 @@ www/*
 !www/.gitignore
 
 __init__.py
-
+
+_rust

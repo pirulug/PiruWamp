@@ -3,6 +3,7 @@ from tkinter import ttk, filedialog, messagebox, scrolledtext, simpledialog
 import webbrowser
 import os
 import threading
+import ctypes
 
 from ..core.config import config
 from ..core.logger import logger
@@ -17,11 +18,12 @@ from .php_extensions_window import PHPExtensionsWindow
 from .phpmyadmin_manager_window import PHPMYAdminManagerWindow
 from .mariadb_manager_window import MariaDBManagerWindow
 from .debug_window import DebugWindow
+from .tray_icon import TrayIconManager
 from ..managers.live_monitor import live_monitor
 from .theme import apply_theme, apply_window_style, style_button, style_label, style_frame, BG_COLOR, FONT_TITLE
 
 class MainWindow:
-    def __init__(self, root):
+    def __init__(self, root, start_minimized=False):
         self.root = root
         self.root.title("PiruWamp")
         window_width = 660
@@ -35,6 +37,7 @@ class MainWindow:
         apply_window_style(self.root)
         
         # Intentar cargar icono si existe
+        self.icon_path = None
         icon_candidates = [
             os.path.join(config.wamp_root, "core", "img", "icon.ico"),
             os.path.join(config.wamp_root, "icon.ico"),
@@ -42,6 +45,7 @@ class MainWindow:
         ]
         for candidate in icon_candidates:
             if os.path.exists(candidate):
+                self.icon_path = candidate
                 try:
                     self.root.iconbitmap(default=candidate)
                     break
@@ -56,19 +60,27 @@ class MainWindow:
         self.mariadb = MariaDBService()
         self.hosts_manager = HostsManager()
         self.vhost_manager = VHostManager()
+        self._tray_notified = False
+        self._is_setup_pending = False
+        self._minimize_to_tray_var = tk.BooleanVar(value=config.minimize_to_tray)
 
         self._setup_ui()
         self._setup_menu()
         self._start_log_monitor()
+        self._setup_tray()
+        self._start_restore_listener()
         
         # Check if first-run setup is required
         from ..managers.setup_manager import SetupManager
         from .setup_window import SetupWindow
 
         if SetupManager.is_setup_required():
+            self._is_setup_pending = True
             SetupWindow(self.root, on_complete=self._on_setup_complete)
         else:
             self._post_init_setup()
+            if start_minimized or config.start_minimized:
+                self.root.after(0, lambda: self.hide_to_tray(notify=False))
 
     def _post_init_setup(self):
         # 1. Actualizar dinamicamente todas las rutas de configuracion en cada apertura
@@ -95,6 +107,7 @@ class MainWindow:
         self.update_services_buttons()
 
     def _on_setup_complete(self):
+        self._is_setup_pending = False
         self.apache = ApacheService()
         self.mariadb = MariaDBService()
         self._post_init_setup()
@@ -349,6 +362,17 @@ class MainWindow:
 
     def _setup_menu(self):
         self.menubar = tk.Menu(self.root)
+
+        self.menu_sistema = tk.Menu(self.menubar, tearoff=0)
+        self.menubar.add_cascade(label="Sistema", menu=self.menu_sistema)
+        self.menu_sistema.add_checkbutton(
+            label="Minimizar a bandeja al cerrar",
+            variable=self._minimize_to_tray_var,
+            command=self.toggle_minimize_to_tray
+        )
+        self.menu_sistema.add_command(label="Ocultar en bandeja", command=self.hide_to_tray)
+        self.menu_sistema.add_separator()
+        self.menu_sistema.add_command(label="Salir de PiruWamp", command=self.quit_app)
         
         self.menu_proyectos = tk.Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Proyectos", menu=self.menu_proyectos)
@@ -555,8 +579,78 @@ class MainWindow:
     def open_debug_window(self):
         DebugWindow(self)
 
+    def _setup_tray(self):
+        self.tray = TrayIconManager(
+            icon_path=self.icon_path,
+            tooltip="PiruWamp",
+            on_show=lambda: self.root.after(0, self.show_from_tray),
+            on_toggle_apache=lambda: self.root.after(0, self.toggle_apache),
+            on_toggle_mariadb=lambda: self.root.after(0, self.toggle_mariadb),
+            on_open_localhost=lambda: self.root.after(0, self.open_web_browser),
+            on_open_phpmyadmin=lambda: self.root.after(0, self.open_phpmyadmin_browser),
+            on_exit=lambda: self.root.after(0, self.quit_app),
+            is_apache_running=self.apache.is_running,
+            is_mariadb_running=self.mariadb.is_running,
+        )
+        self.tray.start()
+
+    def _start_restore_listener(self):
+        """Escucha eventos de instancia unica para restaurar la ventana si se vuelve a abrir el ejecutable."""
+        def listen():
+            try:
+                kernel32 = ctypes.windll.kernel32
+                event_handle = kernel32.CreateEventW(None, False, False, "PiruWampShowWindowEvent")
+                if not event_handle:
+                    return
+                while True:
+                    res = kernel32.WaitForSingleObject(event_handle, 0xFFFFFFFF)
+                    if res == 0:
+                        try:
+                            self.root.after(0, self.show_from_tray)
+                        except Exception:
+                            break
+                    else:
+                        break
+            except Exception:
+                pass
+
+        threading.Thread(target=listen, daemon=True).start()
+
+    def toggle_minimize_to_tray(self):
+        config.set_minimize_to_tray(self._minimize_to_tray_var.get())
+
+    def hide_to_tray(self, notify=True):
+        self.root.withdraw()
+        if notify and not self._tray_notified:
+            self._tray_notified = True
+            self.tray.show_notification(
+                "PiruWamp",
+                "PiruWamp sigue ejecutandose en segundo plano en los iconos ocultos."
+            )
+
+    def show_from_tray(self):
+        self.root.deiconify()
+        try:
+            self.root.state("normal")
+        except Exception:
+            pass
+        self.root.lift()
+        self.root.focus_force()
+        self.update_services_buttons()
+
     def on_close(self):
+        if not self._is_setup_pending and config.minimize_to_tray and self.tray.is_active:
+            self.hide_to_tray()
+        else:
+            self.quit_app()
+
+    def quit_app(self):
         logger.log("Cerrando PiruWamp y deteniendo servicios...", "System")
+        try:
+            if hasattr(self, "tray") and self.tray:
+                self.tray.stop()
+        except Exception:
+            pass
         try:
             live_monitor.stop()
         except Exception:

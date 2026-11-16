@@ -192,6 +192,24 @@ class Config:
             pass
 
     @property
+    def minimize_to_tray(self):
+        val = str(self.data.get("minimize_to_tray", "true")).strip().lower()
+        return val in ("true", "1", "yes", "si")
+
+    def set_minimize_to_tray(self, enabled):
+        self.data["minimize_to_tray"] = "true" if enabled else "false"
+        self.save_config()
+
+    @property
+    def start_minimized(self):
+        val = str(self.data.get("start_minimized", "false")).strip().lower()
+        return val in ("true", "1", "yes", "si")
+
+    def set_start_minimized(self, enabled):
+        self.data["start_minimized"] = "true" if enabled else "false"
+        self.save_config()
+
+    @property
     def data_path(self):
         return os.path.join(self.wamp_root, "data")
 
