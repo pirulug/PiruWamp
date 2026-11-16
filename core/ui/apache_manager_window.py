@@ -107,5 +107,10 @@ class ApacheManagerWindow(tk.Toplevel):
 
     def activate_version(self, name):
         config.set_apache_version(name)
+        try:
+            self.parent_app.apache.update_configs()
+            self.parent_app.apache.ensure_mod_rewrite()
+        except Exception:
+            pass
         messagebox.showinfo("Apache", f"Versión {name} activada.\nSe aplicará al iniciar Apache.")
         self.refresh_list()

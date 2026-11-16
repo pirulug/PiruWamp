@@ -67,8 +67,63 @@ class ApacheService(BaseService):
         self._update_extra_confs()
         PHPManager.update_php_ini()
 
-    def _update_httpd_conf(self):
+    def _check_and_enable_mod_rewrite(self, content: str) -> tuple[str, str]:
+        """Verifica que mod_rewrite este habilitado en el contenido de httpd.conf.
+        Si esta comentado lo descomenta, y si no existe lo agrega.
+        """
+        if re.search(r"^\s*LoadModule\s+rewrite_module\s+", content, flags=re.M):
+            return content, "mod_rewrite verificado y activo"
+
+        if re.search(r"^\s*#\s*LoadModule\s+rewrite_module\s+", content, flags=re.M):
+            new_content = re.sub(
+                r"^\s*#\s*(LoadModule\s+rewrite_module\s+.*)$",
+                r"\1",
+                content,
+                flags=re.M
+            )
+            return new_content, "mod_rewrite estaba deshabilitado; ha sido activado (descomentado)"
+
+        rewrite_line = "LoadModule rewrite_module modules/mod_rewrite.so"
+        loadmodule_matches = list(re.finditer(r"^\s*#?\s*LoadModule\s+.*$", content, flags=re.M))
+        if loadmodule_matches:
+            last_pos = loadmodule_matches[-1].end()
+            new_content = content[:last_pos] + "\n" + rewrite_line + content[last_pos:]
+        else:
+            new_content = rewrite_line + "\n" + content
+        return new_content, "mod_rewrite no estaba presente; ha sido agregado y activado"
+
+    def ensure_mod_rewrite(self) -> bool:
+        """Verifica y asegura que mod_rewrite este habilitado en httpd.conf."""
+        if not config.apache_path or not os.path.exists(config.apache_path):
+            return False
+
         httpd_conf = os.path.join(config.apache_path, "conf", "httpd.conf")
+        if not os.path.exists(httpd_conf):
+            return False
+
+        try:
+            with open(httpd_conf, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            new_content, message = self._check_and_enable_mod_rewrite(content)
+            if new_content != content:
+                with open(httpd_conf, "w", encoding="utf-8") as f:
+                    f.write(new_content)
+
+            logger.log(message, self.name)
+            return True
+        except Exception as e:
+            logger.log(f"Error verificando mod_rewrite en httpd.conf: {e}", self.name)
+            return False
+
+    def _update_httpd_conf(self):
+        if not config.apache_path or not os.path.exists(config.apache_path):
+            return
+
+        httpd_conf = os.path.join(config.apache_path, "conf", "httpd.conf")
+        if not os.path.exists(httpd_conf):
+            return
+
         logs_path = os.path.join(config.apache_path, "logs")
         if not os.path.exists(logs_path):
             os.makedirs(logs_path, exist_ok=True)
@@ -101,6 +156,13 @@ class ApacheService(BaseService):
 
             content = re.sub(r'^\s*<Directory\s+"?([^">\n]+)"?>', fix_directory, content, flags=re.M)
 
+            # 2.1 Asegurar AllowOverride All en el Directory de www_path
+            escaped_www = re.escape(www_path)
+            def fix_allow_override(match):
+                block = match.group(0)
+                return re.sub(r'^\s*AllowOverride\s+None\b', '    AllowOverride All', block, flags=re.M | re.IGNORECASE)
+
+            content = re.sub(rf'<Directory\s+"?{escaped_www}"?>[\s\S]*?</Directory>', fix_allow_override, content, flags=re.IGNORECASE)
 
             # 3. DirectoryIndex
             if "DirectoryIndex index.php" not in content:
@@ -114,6 +176,10 @@ class ApacheService(BaseService):
 
             if "HostnameLookups Off" not in content:
                 content += "\nHostnameLookups Off\nUseCanonicalName Off\n"
+
+            # 3.2 Asegurar que mod_rewrite este habilitado
+            content, rewrite_msg = self._check_and_enable_mod_rewrite(content)
+            logger.log(rewrite_msg, self.name)
 
             # Optimizaciones de rendimiento para Windows (12 nucleos / 16GB RAM)
             perf_block = """
@@ -133,8 +199,6 @@ KeepAliveTimeout 5
             if "AcceptFilter http none" not in content:
                 content += perf_block
 
-
-
             # 4. Asegurar que existan los Includes al final y actualizarlos si ya existen
             def update_or_add_include(text, filename_pattern, new_include):
                 pattern = r'^Include(?:Optional)?\s+.*' + filename_pattern + r'.*$'
@@ -150,7 +214,7 @@ KeepAliveTimeout 5
             with open(httpd_conf, "w", encoding="utf-8") as f:
                 f.write(content)
             
-            logger.log("httpd.conf actualizado con DocumentRoot, Index e Includes", self.name)
+            logger.log("httpd.conf actualizado con DocumentRoot, mod_rewrite, Index e Includes", self.name)
         except Exception as e:
             logger.log(f"Error actualizando httpd.conf: {e}", self.name)
 

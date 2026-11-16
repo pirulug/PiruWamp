@@ -77,6 +77,7 @@ class MainWindow:
             PHPManager.update_php_ini()
             self.mariadb.update_config()
             self.apache.update_configs()
+            self.apache.ensure_mod_rewrite()
         except Exception as e:
             logger.log(f"Error actualizando rutas al iniciar: {e}", "System")
 
@@ -365,6 +366,7 @@ class MainWindow:
         self.menu_apache = tk.Menu(self.menubar, tearoff=0)
         self.menubar.add_cascade(label="Apache", menu=self.menu_apache)
         self.menu_apache.add_command(label="Configurar httpd.conf", command=lambda: os.startfile(os.path.join(config.apache_path, "conf", "httpd.conf")))
+        self.menu_apache.add_command(label="Verificar mod_rewrite", command=self.check_mod_rewrite_action)
         self.menu_apache.add_command(label="Administrar Versiones de Apache", command=self.open_apache_manager)
 
         self.menu_mariadb = tk.Menu(self.menubar, tearoff=0)
@@ -447,6 +449,13 @@ class MainWindow:
         time.sleep(0.5)
         self.apache.start()
         self.update_services_buttons()
+
+    def check_mod_rewrite_action(self):
+        success = self.apache.ensure_mod_rewrite()
+        if success:
+            messagebox.showinfo("Apache mod_rewrite", "El modulo mod_rewrite se encuentra activo y verificado en Apache.")
+        else:
+            messagebox.showwarning("Apache mod_rewrite", "No se pudo verificar mod_rewrite. Asegurate de tener una version de Apache instalada y seleccionada.")
 
     def update_both_button(self):
         if self.apache.is_running() and self.mariadb.is_running():
